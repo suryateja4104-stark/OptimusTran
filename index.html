@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OptiFreight India | Multi-Modal & Elevation Logistics Planner</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-theme">
+
+  <!-- Top Navbar -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-icon">
+        <i class="fa-solid fa-truck-ramp-box"></i>
+      </div>
+      <div class="logo-text">
+        <h1>OptiFreight India</h1>
+        <span>Logistics & Seaways Engine</span>
+      </div>
+    </div>
+
+    <!-- TOP OPTIMIZATION STRATEGY SELECTOR - STRICT SINGLE LINE -->
+    <div class="top-strategy-bar">
+      <button class="strategy-pill active" data-strat="balanced">
+        <i class="fa-solid fa-scale-balanced"></i><span>Balanced</span>
+      </button>
+      <button class="strategy-pill" data-strat="cheapest">
+        <i class="fa-solid fa-indian-rupee-sign"></i><span>Cheapest</span>
+      </button>
+      <button class="strategy-pill" data-strat="fastest">
+        <i class="fa-solid fa-bolt"></i><span>Fastest</span>
+      </button>
+      <button class="strategy-pill" data-strat="eco">
+        <i class="fa-solid fa-leaf"></i><span>Eco-Safe</span>
+      </button>
+    </div>
+
+    <div class="header-actions">
+      <!-- Tweak Assumptions Button -->
+      <button id="btnAssumptionsModal" class="btn-secondary highlight-btn" title="Tweak calculation benchmarks, rate cards & physics parameters">
+        <i class="fa-solid fa-sliders"></i> Tweak Assumptions
+      </button>
+
+      <!-- Show Calculation Logic Button -->
+      <button id="btnShowLogic" class="btn-secondary" title="View step-by-step mathematical logic">
+        <i class="fa-solid fa-calculator"></i> Logic
+      </button>
+
+      <!-- Preset Corridor Selector -->
+      <div class="preset-selector">
+        <label for="corridorPreset"><i class="fa-solid fa-route"></i> Corridor:</label>
+        <select id="corridorPreset">
+          <option value="hyd-che" selected>Hyderabad ➔ Chennai (Eastern Ghats)</option>
+          <option value="mum-pne">Mumbai ➔ Pune (Bhor Ghat Incline)</option>
+          <option value="mum-del">Mumbai ➔ Delhi (Ghats & Plateau)</option>
+          <option value="blr-hyd">Bengaluru ➔ Hyderabad (Deccan Ridge)</option>
+          <option value="custom">-- Custom City Select --</option>
+        </select>
+      </div>
+
+      <!-- Settings Button -->
+      <button id="btnSettingsModal" class="btn-secondary" title="Map Settings">
+        <i class="fa-solid fa-gear"></i> Settings
+      </button>
+    </div>
+  </header>
+
+  <!-- Main App Layout -->
+  <div class="app-container">
+    
+    <!-- Left Sidebar: Controls & Inputs -->
+    <aside class="sidebar-panel">
+      
+      <!-- City Selection Panel -->
+      <div class="panel-section">
+        <h3 class="section-title"><i class="fa-solid fa-location-dot"></i> Origin & Destination Cities</h3>
+        
+        <div class="input-group">
+          <label for="originCitySelect">Origin (Point A)</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-circle-dot origin-pin"></i>
+            <select id="originCitySelect" class="sidebar-select">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <div class="swap-btn-container">
+          <button id="btnSwapLocations" title="Swap Origin and Destination">
+            <i class="fa-solid fa-arrow-down-up-lock"></i> Swap Cities
+          </button>
+        </div>
+
+        <div class="input-group">
+          <label for="destCitySelect">Destination (Point B)</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-location-dot dest-pin"></i>
+            <select id="destCitySelect" class="sidebar-select">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle Selection & Mileage Option -->
+      <div class="panel-section">
+        <h3 class="section-title"><i class="fa-solid fa-truck-moving"></i> Vehicle & Fleet Specs</h3>
+        
+        <div class="input-group">
+          <label for="vehicleSelect">Fleet Vehicle Type</label>
+          <select id="vehicleSelect" class="sidebar-select">
+            <option value="heavy_25t" selected>Heavy 12-Wheeler (25T Payload)</option>
+            <option value="rigid_16t">Standard 6-Wheeler Rigid (16T Payload)</option>
+            <option value="trailer_40t">Multi-Axle Container Trailer (40T Payload)</option>
+            <option value="lcv_6t">Medium LCV (6T Payload)</option>
+            <option value="ev_heavy">Electric Freight Heavy Truck</option>
+          </select>
+        </div>
+
+        <div class="input-grid-2">
+          <div class="input-group">
+            <label for="vehicleMileage">Mileage (km/L)</label>
+            <input type="number" id="vehicleMileage" value="3.2" min="0.5" max="25" step="0.1">
+          </div>
+          <div class="input-group">
+            <label for="dieselRate">Diesel (₹/L)</label>
+            <input type="number" id="dieselRate" value="94.50" min="50" step="0.5">
+          </div>
+        </div>
+      </div>
+
+      <!-- Cargo Payload & Dimensions -->
+      <div class="panel-section">
+        <h3 class="section-title"><i class="fa-solid fa-boxes-stacked"></i> Cargo Specs & Sizing</h3>
+        
+        <div class="input-grid-2">
+          <div class="input-group">
+            <label for="payloadTons">Weight (Tons)</label>
+            <input type="number" id="payloadTons" value="18" min="0.1" step="0.5">
+          </div>
+          <div class="input-group">
+            <label for="cargoType">Freight Type</label>
+            <select id="cargoType" class="sidebar-select">
+              <option value="general">General Cargo</option>
+              <option value="heavy">Heavy Machinery</option>
+              <option value="volumetric">Volumetric Goods</option>
+              <option value="perishable">Cold Chain</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dimensions-title">Cargo Dimensions (Meters):</div>
+        <div class="input-grid-3">
+          <div class="input-group">
+            <label for="dimLength">L (m)</label>
+            <input type="number" id="dimLength" value="6.0" min="0.1" step="0.1">
+          </div>
+          <div class="input-group">
+            <label for="dimWidth">W (m)</label>
+            <input type="number" id="dimWidth" value="2.4" min="0.1" step="0.1">
+          </div>
+          <div class="input-group">
+            <label for="dimHeight">H (m)</label>
+            <input type="number" id="dimHeight" value="2.6" min="0.1" step="0.1">
+          </div>
+        </div>
+
+        <div class="volume-badge" id="volumeSummaryBadge">
+          <i class="fa-solid fa-cube"></i> Total Volume: <strong>37.4 m³</strong>
+        </div>
+      </div>
+
+      <!-- Road Routing Strategy -->
+      <div class="panel-section">
+        <h3 class="section-title"><i class="fa-solid fa-mountain-city"></i> Incline Strategy</h3>
+        
+        <div class="input-group">
+          <label for="roadRoutePreference">Highway Strategy</label>
+          <select id="roadRoutePreference" class="sidebar-select">
+            <option value="eco" selected>Eco-Incline Bypass (Min Climb)</option>
+            <option value="shortest">Shortest Distance Highway</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <button id="btnCalculate" class="btn-primary-block">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Calculate & Optimize Routes
+      </button>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-dashboard">
+      
+      <!-- Top Metric Highlights -->
+      <section class="kpi-grid">
+        <div class="kpi-card highlight-recommended">
+          <div class="kpi-icon"><i class="fa-solid fa-trophy"></i></div>
+          <div class="kpi-details">
+            <span class="kpi-label">Recommended Mode</span>
+            <h2 class="kpi-value" id="kpiOptMode">Indian Rail Freight</h2>
+            <span class="kpi-subtext" id="kpiOptSub">Strategy: Balanced Priority</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-route"></i></div>
+          <div class="kpi-details">
+            <span class="kpi-label">Route Distance</span>
+            <h2 class="kpi-value" id="kpiDistance">625 km</h2>
+            <span class="kpi-subtext" id="kpiDistanceSub">Corridor</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+          <div class="kpi-details">
+            <span class="kpi-label">Lowest Freight Cost</span>
+            <h2 class="kpi-value" id="kpiLowestCost">₹20,781</h2>
+            <span class="kpi-subtext" id="kpiCostSub">Save up to 48% vs Air</span>
+          </div>
+        </div>
+
+        <div class="kpi-card eco-savings">
+          <div class="kpi-icon"><i class="fa-solid fa-leaf"></i></div>
+          <div class="kpi-details">
+            <span class="kpi-label">Eco-Climb Fuel Saved</span>
+            <h2 class="kpi-value" id="kpiEcoSavings">48.2 L</h2>
+            <span class="kpi-subtext" id="kpiEcoSavingsSub">Save ₹4,555 by avoiding climbs</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Visualizer Container (Map + Elevation Chart) -->
+      <section class="visualizer-container">
+        <!-- INTERMEDIATE CITIES STRIP MOVED TO THE VERY TOP -->
+        <div class="intermediate-cities-top-strip" id="intermediateCitiesStrip">
+          <!-- Dynamically populated with intermediate cities along optimal route -->
+        </div>
+
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="mapTab">
+            <i class="fa-solid fa-map"></i> Interactive Route Map
+          </button>
+          <button class="tab-btn" data-tab="elevationTab">
+            <i class="fa-solid fa-chart-area"></i> Elevation Profile & City Callouts
+          </button>
+        </div>
+
+        <div class="tab-content active" id="mapTab">
+          <div id="leafletMap" class="map-view"></div>
+          <div class="map-overlay-legend">
+            <div class="legend-item"><span class="legend-line shortest-line"></span> Shortest Highway (Steep Ghats)</div>
+            <div class="legend-item"><span class="legend-line eco-line"></span> Eco-Incline Route (Gentle Contour)</div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="elevationTab">
+          <div class="chart-wrapper">
+            <canvas id="elevationChartCanvas"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Multi-Modal Comparison Cards Grid -->
+      <section class="section-container">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-scale-balanced"></i> Indian Multi-Modal Freight Breakdown (Road, Rail, Air, Seaways)</h2>
+          <span>Side-by-side comparison across all 4 modes in Indian Rupees (₹)</span>
+        </div>
+
+        <div class="modal-cards-grid" id="modalCardsGrid">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- Road Eco-Incline Deep Dive Panel -->
+      <section class="section-container eco-deepdive">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-mountain"></i> Road Transport Eco-Incline Analysis</h2>
+          <span>Evaluation of vertical climb gradients and truck fuel penalty savings</span>
+        </div>
+
+        <div class="eco-analysis-content">
+          <div class="eco-banner" id="ecoBanner">
+            <div class="eco-banner-icon"><i class="fa-solid fa-seedling"></i></div>
+            <div class="eco-banner-text" id="ecoBannerText">
+              Taking the <strong>Eco-Incline Bypass</strong> reduces vertical climb by <strong>810 meters</strong>, saving <strong>48.2 Liters</strong> of diesel (₹4,555 savings) compared to the shortest mountain highway.
+            </div>
+          </div>
+
+          <div class="eco-comparison-table-wrapper">
+            <table class="eco-table">
+              <thead>
+                <tr>
+                  <th>Route Option</th>
+                  <th>Distance (km)</th>
+                  <th>Total Climb (m)</th>
+                  <th>Max Grade</th>
+                  <th>Est. Diesel (L)</th>
+                  <th>Fuel Cost (₹)</th>
+                  <th>Total Freight Cost (₹)</th>
+                </tr>
+              </thead>
+              <tbody id="ecoTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- INTERACTIVE ASSUMPTIONS & RATE CARDS MODAL -->
+  <div class="modal-backdrop" id="assumptionsModal">
+    <div class="modal-dialog logic-modal-dialog">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-sliders"></i> Tweak Calculation Benchmarks & Operational Assumptions</h3>
+        <button class="modal-close" id="btnCloseAssumptions">&times;</button>
+      </div>
+      <div class="modal-body logic-modal-body">
+        
+        <!-- Section 1: Incline Energy Physics -->
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-mountain"></i> 1. Powertrain & Incline Physics Parameters</h4>
+          <div class="input-grid-3">
+            <div class="input-group">
+              <label for="assumpEngineEff">Engine Efficiency (%)</label>
+              <input type="number" id="assumpEngineEff" value="38" min="20" max="55" step="1">
+            </div>
+            <div class="input-group">
+              <label for="assumpTareWeight">Truck Empty Weight (Tons)</label>
+              <input type="number" id="assumpTareWeight" value="12" min="3" max="25" step="1">
+            </div>
+            <div class="input-group">
+              <label for="assumpFuelEnergy">Fuel Energy Density (MJ/L)</label>
+              <input type="number" id="assumpFuelEnergy" value="38.6" min="30" max="45" step="0.5">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Indian Railways Rate Cards -->
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-train"></i> 2. Indian Railways Freight Benchmarks</h4>
+          <div class="input-grid-2">
+            <div class="input-group">
+              <label for="assumpRailSidingFee">Siding & Handling Fee (₹)</label>
+              <input type="number" id="assumpRailSidingFee" value="4500" step="500">
+            </div>
+            <div class="input-group">
+              <label for="assumpRailLinehaul">Linehaul Rate (₹ / Ton-Km)</label>
+              <input type="number" id="assumpRailLinehaul" value="1.45" step="0.05">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Domestic Air Cargo Benchmarks -->
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-plane"></i> 3. Domestic Air Cargo Benchmarks</h4>
+          <div class="input-grid-2">
+            <div class="input-group">
+              <label for="assumpAirHandlingFee">Terminal Handling Fee (₹)</label>
+              <input type="number" id="assumpAirHandlingFee" value="3500" step="500">
+            </div>
+            <div class="input-group">
+              <label for="assumpAirLinehaul">Linehaul Rate (₹ / kg / km)</label>
+              <input type="number" id="assumpAirLinehaul" value="0.048" step="0.005">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Coastal Seaways Benchmarks -->
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-ship"></i> 4. Coastal Seaways Barges Benchmarks</h4>
+          <div class="input-grid-2">
+            <div class="input-group">
+              <label for="assumpSeaPortFee">Port & Feeder Drayage Fee (₹)</label>
+              <input type="number" id="assumpSeaPortFee" value="6800" step="500">
+            </div>
+            <div class="input-group">
+              <label for="assumpSeaLinehaul">Linehaul Rate (₹ / Ton-Km)</label>
+              <input type="number" id="assumpSeaLinehaul" value="0.42" step="0.02">
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnResetAssumptions">Reset Benchmarks</button>
+        <button class="btn-primary" id="btnSaveAssumptions">Apply Custom Assumptions</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATION LOGIC MODAL -->
+  <div class="modal-backdrop" id="logicModal">
+    <div class="modal-dialog logic-modal-dialog">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-calculator"></i> Logistics & Elevation Calculation Logic</h3>
+        <button class="modal-close" id="btnCloseLogic">&times;</button>
+      </div>
+      <div class="modal-body logic-modal-body">
+        
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-truck"></i> 1. Road Freight & Vehicle Mileage Formula</h4>
+          <p>Road logistics cost combines distance-based fleet rates, baseline fuel consumption, vehicle payload weight, and incline elevation penalties.</p>
+          <div class="formula-box">
+            <code>Total Fuel (Liters) = (Distance / Mileage) + Extra Incline Fuel</code><br>
+            <code>Fuel Cost (₹) = Total Fuel × Diesel Price (₹/L)</code><br>
+            <code>Total Road Cost (₹) = (Distance × Fleet Base Rate) + (Distance × Weight × Rate/Ton-Km) + Incline Fuel Cost</code>
+          </div>
+        </div>
+
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-ship"></i> 2. Coastal Seaways Shipping Formula (Sagarmala Corridor)</h4>
+          <p>Coastal shipping provides the lowest cost and lowest emissions (14g CO₂/ton-km) for coastal city corridors via coastal barges and container feeder vessels.</p>
+          <div class="formula-box">
+            <code>Coastal Distance (km) = Road Distance × 1.12 Nautical Margin</code><br>
+            <code>Sea Linehaul Cost (₹) = Coastal Distance × Chargeable Weight × ₹0.42 / Ton-Km</code><br>
+            <code>Total Seaways Freight (₹) = ₹6,800 Port Handling & Feeder Fee + Sea Linehaul</code>
+          </div>
+        </div>
+
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-mountain"></i> 3. Eco-Incline Ascent Physics & Fuel Penalty Formula</h4>
+          <p>Climbing steep inclines consumes extra fuel due to potential energy work ($W = m \cdot g \cdot h$) against gravity and thermal powertrain losses.</p>
+          <div class="formula-box">
+            <code>Gross Mass (kg) = (Tare Vehicle Weight 12T + Cargo Payload) × 1000</code><br>
+            <code>Potential Energy (MJ) = Gross Mass × 9.81 m/s² × Total Ascent (meters) / 10⁶</code><br>
+            <code>Extra Incline Diesel (Liters) = Potential Energy (MJ) / (38.6 MJ/L × 0.38 Engine Efficiency)</code><br>
+            <code>Incline Savings (₹) = (Shortest Route Liters - Eco Route Liters) × Diesel Rate</code>
+          </div>
+        </div>
+
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-train"></i> 4. Indian Railways Freight Formula (IRCTC / CONCOR Tariff)</h4>
+          <p>Rail freight charges are computed siding-to-siding based on weight thresholds and distance class tiers.</p>
+          <div class="formula-box">
+            <code>Chargeable Weight (Tons) = Max(Payload Tons, 10 Tons Threshold)</code><br>
+            <code>Base Linehaul = Distance × Chargeable Weight × ₹1.45 / Ton-Km</code><br>
+            <code>If Payload > 25 Tons ➔ Apply 12% Bulk Wagon Discount: Linehaul × 0.88</code><br>
+            <code>Total Rail Cost (₹) = ₹4,500 Siding & Drayage Fee + Linehaul</code>
+          </div>
+        </div>
+
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-plane"></i> 5. Air Freight Volumetric & Chargeable Weight Rating</h4>
+          <p>IATA standard dimensional weight formula determines whether cargo rate is charged on actual weight or volumetric size.</p>
+          <div class="formula-box">
+            <code>Cargo Volume (m³) = Length (m) × Width (m) × Height (m)</code><br>
+            <code>Air Volumetric Weight (kg) = Volume (m³) × 167 kg/m³</code><br>
+            <code>Air Chargeable Weight (kg) = Max(Actual Cargo Weight, Volumetric Weight)</code><br>
+            <code>Total Air Cargo Cost (₹) = ₹3,500 Terminal Fee + (Distance × Chargeable Weight × ₹0.048 / kg / km)</code>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnCloseLogicFooter">Close Explanation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-sliders"></i> Application & Map Provider Settings</h3>
+        <button class="modal-close" id="btnCloseSettings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="mapProviderSelect">Primary Map Provider</label>
+          <select id="mapProviderSelect" class="sidebar-select">
+            <option value="leaflet" selected>Leaflet + OpenStreetMap Light Tiles (No API Key required)</option>
+            <option value="gmaps">Google Maps API (Custom API Key)</option>
+          </select>
+        </div>
+
+        <div class="input-group" id="gmapsKeyGroup" style="display: none;">
+          <label for="gmapsApiKey">Google Maps API Key</label>
+          <input type="text" id="gmapsApiKey" placeholder="AIzaSy...">
+          <span class="help-text">Requires Maps JavaScript API, Directions API, and Elevation API enabled.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCancelSettings">Cancel</button>
+        <button class="btn-primary" id="btnSaveSettings">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="city-data.js"></script>
+  <script src="transport-engine.js"></script>
+  <script src="elevation-router.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
