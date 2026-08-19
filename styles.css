@@ -40,25 +40,25 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE / Edge */
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* Hide scrollbars globally across Chrome, Safari, Opera, Edge */
-*::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
+/* Sleek modern custom scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
 }
-
-*::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-track,
-*::-webkit-scrollbar-corner {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
+::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
 }
 
 html, body {
@@ -67,10 +67,11 @@ html, body {
   color: var(--text-main);
   font-family: var(--font-family);
   line-height: 1.5;
-  height: 100vh;
-  width: 100vw;
+  min-height: 100vh;
+  width: 100%;
   max-width: 100%;
-  overflow: hidden !important;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Header Navbar */
@@ -301,13 +302,13 @@ select:focus, input:focus {
 .app-container {
   display: grid;
   grid-template-columns: 350px 1fr;
-  height: calc(100vh - 65px);
+  min-height: calc(100vh - 65px);
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
-/* Sidebar Panel - EXTENDED TO BOTTOM, NO SCROLLBAR */
+/* Sidebar Panel - SCROLLABLE */
 .sidebar-panel {
   background: rgba(255, 255, 255, 0.65);
   border-right: 1px solid rgba(255, 255, 255, 0.8);
@@ -317,8 +318,10 @@ select:focus, input:focus {
   gap: 0.6rem;
   backdrop-filter: var(--backdrop-blur);
   width: 100%;
-  height: 100%;
-  overflow-y: hidden; /* Absolutely no scrollbar */
+  height: calc(100vh - 65px);
+  position: sticky;
+  top: 65px;
+  overflow-y: auto;
 }
 
 .panel-section {
@@ -438,20 +441,9 @@ select:focus, input:focus {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  height: 100%;
+  min-height: calc(100vh - 65px);
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
-.main-dashboard::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
-}
-
 /* KPI Cards Grid */
 .kpi-grid {
   display: grid;
