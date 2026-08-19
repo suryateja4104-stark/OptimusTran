@@ -595,7 +595,23 @@ class TransportPlannerApp {
     return vol;
   }
 
-  updateMapRoutes() {
+  async fetchOsrmRoute(waypoints) {
+    try {
+      const locStr = waypoints.map(w => `${w[1]},${w[0]}`).join(';');
+      const url = `https://router.project-osrm.org/route/v1/driving/${locStr}?overview=full&geometries=geojson`;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates) {
+        return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      }
+    } catch (e) {
+      console.warn("OSRM routing API fallback:", e);
+    }
+    return null;
+  }
+
+  async updateMapRoutes() {
     if (!this.map) return;
     const origin = this.originCity;
     const destination = this.destCity;
@@ -629,21 +645,31 @@ class TransportPlannerApp {
       .addTo(this.map)
       .bindPopup(`<b>Destination:</b> ${destination.name}`);
 
-    const shortestWaypoints = elevationData.shortestRoute.waypoints || this.interpolatePolyline(origin, destination, 0.08);
-    const ecoWaypoints = elevationData.ecoRoute.waypoints || this.interpolatePolyline(origin, destination, -0.05);
+    let shortestInput = [[origin.lat, origin.lng], [destination.lat, destination.lng]];
+    if (elevationData.shortestRoute.waypoints && elevationData.shortestRoute.waypoints.length >= 2) {
+      shortestInput = elevationData.shortestRoute.waypoints;
+    }
 
-    this.shortestPolyline = L.polyline(shortestWaypoints, {
+    let ecoInput = [[origin.lat, origin.lng], [destination.lat, destination.lng]];
+    if (elevationData.ecoRoute.waypoints && elevationData.ecoRoute.waypoints.length >= 2) {
+      ecoInput = elevationData.ecoRoute.waypoints;
+    }
+
+    const realShortestCoords = await this.fetchOsrmRoute(shortestInput) || shortestInput;
+    const realEcoCoords = await this.fetchOsrmRoute(ecoInput) || ecoInput;
+
+    this.shortestPolyline = L.polyline(realShortestCoords, {
       color: '#e11d48',
       weight: (roadPref === 'shortest') ? 6 : 3,
       dashArray: '6, 8',
       opacity: (roadPref === 'shortest') ? 0.95 : 0.4
-    }).addTo(this.map).bindPopup(`<b>🔴 Red Dashed Line: Shortest Highway</b><br>NH65/NH16 Direct Cut (Steep Ghat Climbs).`);
+    }).addTo(this.map).bindPopup(`<b>🔴 Red Line: Shortest Highway</b><br>Snaps to exact National Highway road geometry.`);
 
-    this.ecoPolyline = L.polyline(ecoWaypoints, {
+    this.ecoPolyline = L.polyline(realEcoCoords, {
       color: '#059669',
       weight: (roadPref === 'eco') ? 6 : 3,
       opacity: (roadPref === 'eco') ? 0.95 : 0.4
-    }).addTo(this.map).bindPopup(`<b>🟢 Green Solid Line: Eco-Incline Bypass</b><br>NH44/NH40 Contour (Gentle Slopes, Fuel Optimized).`);
+    }).addTo(this.map).bindPopup(`<b>🟢 Green Line: Eco-Incline Route</b><br>Snaps to exact Bypass Expressway road geometry.`);
 
     const activeRouteObj = (roadPref === 'eco') ? elevationData.ecoRoute : elevationData.shortestRoute;
     if (activeRouteObj.intermediateCities) {
