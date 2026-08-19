@@ -62,13 +62,17 @@ class TransportPlannerApp {
   initLeafletMap() {
     this.map = L.map('leafletMap', {
       zoomControl: true,
-      attributionControl: false
+      attributionControl: true
     }).setView([15.0, 79.0], 6);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(this.map);
+
+    setTimeout(() => {
+      if (this.map) this.map.invalidateSize();
+    }, 200);
   }
 
   /**
@@ -214,6 +218,25 @@ class TransportPlannerApp {
         e.currentTarget.classList.add('active');
         this.activeStrategy = e.currentTarget.getAttribute('data-strat');
         this.recalculateAll();
+      });
+    });
+
+    // Visualizer Tabs (Map vs Elevation Profile)
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+
+        const targetTabId = e.currentTarget.getAttribute('data-tab');
+        e.currentTarget.classList.add('active');
+        const targetContent = document.getElementById(targetTabId);
+        if (targetContent) {
+          targetContent.classList.add('active');
+          if (targetTabId === 'mapTab' && this.map) {
+            setTimeout(() => this.map.invalidateSize(), 100);
+          }
+        }
       });
     });
 
@@ -542,6 +565,10 @@ class TransportPlannerApp {
       [destination.lat, destination.lng]
     ]);
     this.map.fitBounds(bounds, { padding: [50, 50] });
+
+    setTimeout(() => {
+      if (this.map) this.map.invalidateSize();
+    }, 100);
 
     this.updateElevationChart(elevationData);
     this.renderIntermediateCitiesStrip();
