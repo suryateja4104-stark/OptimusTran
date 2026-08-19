@@ -387,25 +387,6 @@ class TransportPlannerApp {
     btnCloseLogic.addEventListener('click', () => logicModal.classList.remove('active'));
     btnCloseLogicFooter.addEventListener('click', () => logicModal.classList.remove('active'));
 
-    // Tab Switcher
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const targetTab = e.currentTarget.getAttribute('data-tab');
-        tabBtns.forEach(b => b.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(targetTab).classList.add('active');
-
-        if (targetTab === 'mapTab') {
-          setTimeout(() => this.map.invalidateSize(), 100);
-        } else if (targetTab === 'elevationTab') {
-          this.elevationChart.update();
-        }
-      });
-    });
-
     // Settings Modal
     const btnSettings = document.getElementById('btnSettingsModal');
     const settingsModal = document.getElementById('settingsModal');
