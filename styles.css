@@ -227,6 +227,33 @@ select:focus, input:focus {
   white-space: nowrap;
 }
 
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-with-icon i {
+  position: absolute;
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  pointer-events: none;
+  font-size: 0.85rem;
+}
+
+.input-with-icon .origin-pin { color: #059669; }
+.input-with-icon .dest-pin { color: #e11d48; }
+
+.input-with-icon select {
+  padding-left: 2.3rem !important;
+  cursor: pointer;
+  z-index: 1;
+  position: relative;
+}
+
 /* Buttons */
 .btn-primary, .btn-primary-block {
   background: linear-gradient(135deg, var(--accent-blue), #1d4ed8);

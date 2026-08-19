@@ -283,8 +283,14 @@ class TransportPlannerApp {
     const origSelect = document.getElementById('originCitySelect');
     const destSelect = document.getElementById('destCitySelect');
 
-    origSelect.addEventListener('change', () => this.handleCustomCitySelection());
-    destSelect.addEventListener('change', () => this.handleCustomCitySelection());
+    if (origSelect) {
+      origSelect.addEventListener('change', () => this.handleCustomCitySelection());
+      origSelect.addEventListener('input', () => this.handleCustomCitySelection());
+    }
+    if (destSelect) {
+      destSelect.addEventListener('change', () => this.handleCustomCitySelection());
+      destSelect.addEventListener('input', () => this.handleCustomCitySelection());
+    }
 
     // Vehicle Select
     const vehicleSelect = document.getElementById('vehicleSelect');
