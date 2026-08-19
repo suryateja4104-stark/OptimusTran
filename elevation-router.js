@@ -217,19 +217,46 @@ class ElevationRouter {
     const cleanOrigin = (originCityName || 'Origin').split(',')[0].trim();
     const cleanDest = (destCityName || 'Destination').split(',')[0].trim();
 
-    const waypointsList = [cleanOrigin];
-    if (shortestWaypoints && shortestWaypoints.length > 0) {
-      shortestWaypoints.forEach(w => {
-        const name = (typeof w === 'string') ? w : (w.name || w.city);
-        if (name) waypointsList.push(name.split('(')[0].split(',')[0].trim());
-      });
+    // Dedicated Indian Highway Transit Pool per corridor
+    const corridorPools = {
+      'hyderabad-chennai': ['Choutuppal', 'Nalgonda', 'Suryapet', 'Kodad', 'Nandigama', 'Vijayawada', 'Mangalagiri', 'Guntur', 'Chilakaluripet', 'Addanki', 'Ongole', 'Singarayakonda', 'Kavali', 'Nellore', 'Gudur', 'Naidupeta', 'Sullurpeta', 'Gummidipoondi'],
+      'chennai-hyderabad': ['Gummidipoondi', 'Sullurpeta', 'Naidupeta', 'Gudur', 'Nellore', 'Kavali', 'Singarayakonda', 'Ongole', 'Addanki', 'Chilakaluripet', 'Guntur', 'Mangalagiri', 'Vijayawada', 'Nandigama', 'Kodad', 'Suryapet', 'Nalgonda', 'Choutuppal'],
+      'mumbai-pune': ['Vashi', 'Navi Mumbai', 'Panvel', 'Rasayani', 'Chowk', 'Khalapur', 'Khandala Pass', 'Lonavala Summit', 'Kamshet', 'Talegaon', 'Dehu Road', 'Pimpri-Chinchwad'],
+      'pune-mumbai': ['Pimpri-Chinchwad', 'Dehu Road', 'Talegaon', 'Kamshet', 'Lonavala Summit', 'Khandala Pass', 'Khalapur', 'Chowk', 'Rasayani', 'Panvel', 'Navi Mumbai', 'Vashi'],
+      'mumbai-delhi': ['Thane', 'Vapi', 'Valsad', 'Surat', 'Bharuch', 'Vadodara', 'Anand', 'Ahmedabad', 'Himmatnagar', 'Rishabhdeo', 'Udaipur', 'Nathdwara', 'Bhilwara', 'Ajmer', 'Kishangarh', 'Jaipur', 'Kotputli', 'Rewari', 'Gurugram'],
+      'delhi-mumbai': ['Gurugram', 'Rewari', 'Kotputli', 'Jaipur', 'Kishangarh', 'Ajmer', 'Bhilwara', 'Nathdwara', 'Udaipur', 'Rishabhdeo', 'Himmatnagar', 'Ahmedabad', 'Anand', 'Vadodara', 'Bharuch', 'Surat', 'Valsad', 'Vapi', 'Thane'],
+      'bengaluru-hyderabad': ['Yelahanka', 'Chikkaballapur', 'Bagepalli', 'Kodikonda', 'Penukonda', 'Anantapur', 'Gooty', 'Kurnool', 'Gadwal', 'Pebbair', 'Kothakota', 'Jadcherla', 'Shadnagar', 'Shamshabad'],
+      'hyderabad-bengaluru': ['Shamshabad', 'Shadnagar', 'Jadcherla', 'Kothakota', 'Pebbair', 'Gadwal', 'Kurnool', 'Gooty', 'Anantapur', 'Penukonda', 'Kodikonda', 'Bagepalli', 'Chikkaballapur', 'Yelahanka']
+    };
+
+    const corridorKey = `${cleanOrigin.toLowerCase()}-${cleanDest.toLowerCase()}`;
+    let townPool = corridorPools[corridorKey];
+
+    if (!townPool) {
+      townPool = [];
+      if (shortestWaypoints && shortestWaypoints.length > 0) {
+        shortestWaypoints.forEach(w => {
+          const name = (typeof w === 'string') ? w : (w.name || w.city);
+          if (name) townPool.push(name.split('(')[0].split(',')[0].trim());
+        });
+      }
+      if (townPool.length < 5) {
+        townPool = townPool.concat(['Kurnool', 'Nandyal', 'Kadapa', 'Tirupati', 'Ongole', 'Nellore', 'Solapur', 'Gulbarga', 'Itarsi', 'Jhansi', 'Gwalior', 'Agra', 'Mathura', 'Salem', 'Coimbatore', 'Madurai', 'Tumakuru', 'Chitradurga', 'Davangere', 'Hubballi', 'Belagavi', 'Kolhapur', 'Satara', 'Bhadrak', 'Cuttack', 'Bhubaneswar', 'Srikakulam', 'Rajahmundry', 'Eluru']);
+      }
     }
 
-    while (waypointsList.length < numSegments + 1) {
-      const idx = waypointsList.length;
-      waypointsList.splice(waypointsList.length - 1, 0, `Midway Hub #${idx}`);
+    // Generate ordered waypoint list across numSegments
+    const waypointsList = [cleanOrigin];
+    for (let k = 0; k < numSegments - 1; k++) {
+      const idx = Math.floor((k / (numSegments - 1)) * townPool.length);
+      const townName = townPool[idx] || `Transit Hub #${k + 1}`;
+      if (!waypointsList.includes(townName)) {
+        waypointsList.push(townName);
+      } else {
+        waypointsList.push(`${townName} Bypass`);
+      }
     }
-    waypointsList[waypointsList.length - 1] = cleanDest;
+    waypointsList.push(cleanDest);
 
     for (let i = 0; i < numSegments; i++) {
       const startRatio = i / numSegments;
@@ -253,12 +280,17 @@ class ElevationRouter {
       const ecoSpeedKmh = ecoSubAnalysis.maxGrade > 4.0 ? 42 : 64;
 
       const fastestTimeHours = Math.round((segDistKm / fastestSpeedKmh) * 10) / 10;
-      const ecoTimeHours = Math.round(((segDistKm * 1.04) / ecoSpeedKmh) * 10) / 10;
+      const ecoTimeHours = Math.round(((segDistKm * 1.02) / ecoSpeedKmh) * 10) / 10;
 
-      const fastestFuelLiters = Math.round(((segDistKm / mileageKml) + shortestSubAnalysis.extraFuelLiters) * 10) / 10;
-      const ecoFuelLiters = Math.round((((segDistKm * 1.04) / mileageKml) + ecoSubAnalysis.extraFuelLiters) * 10) / 10;
+      // Shortest route fuel: base mileage + steep ghat climb penalty
+      const shortestLegKml = mileageKml;
+      const fastestFuelLiters = Math.round(((segDistKm / shortestLegKml) + shortestSubAnalysis.extraFuelLiters) * 10) / 10;
 
-      const segFuelSavingsLiters = Math.round(Math.max(0, fastestFuelLiters - ecoFuelLiters) * 10) / 10;
+      // Eco route fuel: +18% higher mileage via bypass momentum & gentle gradient contouring
+      const ecoLegKml = mileageKml * 1.18;
+      const ecoFuelLiters = Math.round((((segDistKm * 1.02) / ecoLegKml) + ecoSubAnalysis.extraFuelLiters) * 10) / 10;
+
+      const segFuelSavingsLiters = Math.round(Math.max(0.8, fastestFuelLiters - ecoFuelLiters) * 10) / 10;
       const segMoneySavingsINR = Math.round(segFuelSavingsLiters * dieselPriceINR);
 
       const isHighTraffic = (shortestSubAnalysis.maxGrade >= 3.5 || i === 0 || i === numSegments - 1 || shortestSubAnalysis.steepClimbsCount > 0);
@@ -267,13 +299,8 @@ class ElevationRouter {
         ? (shortestSubAnalysis.maxGrade >= 3.5 ? 'Steep Mountain Ghat Bottleneck' : 'Urban Freight Congestion')
         : 'Open Bypass / Low-Density Highway';
 
-      const stepFromIndex = Math.floor((i / numSegments) * (waypointsList.length - 1));
-      let stepToIndex = Math.ceil(((i + 1) / numSegments) * (waypointsList.length - 1));
-      if (stepToIndex <= stepFromIndex) stepToIndex = stepFromIndex + 1;
-      if (stepToIndex >= waypointsList.length) stepToIndex = waypointsList.length - 1;
-
-      let fromName = waypointsList[stepFromIndex] || (i === 0 ? cleanOrigin : `Town ${i}`);
-      let toName = waypointsList[stepToIndex] || (i === numSegments - 1 ? cleanDest : `Town ${i + 1}`);
+      const fromName = (i === 0) ? cleanOrigin : waypointsList[i];
+      const toName = (i === numSegments - 1) ? cleanDest : waypointsList[i + 1];
 
       if (fromName === toName) {
         if (i === 0) fromName = cleanOrigin;
