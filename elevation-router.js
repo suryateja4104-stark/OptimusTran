@@ -157,7 +157,7 @@ class ElevationRouter {
   /**
    * Compare Shortest Route vs. Eco-Incline Route
    */
-  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50, vehicleCategory = '6axle') {
+  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50, vehicleCategory = '6axle', customSegments = 10) {
     const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons, vehicleCategory);
     const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons, vehicleCategory);
 
@@ -172,7 +172,7 @@ class ElevationRouter {
     const totalClimbSavedMeters = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
 
     const isEcoRouteSuperior = netFuelSavedLiters > 0;
-    const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR);
+    const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR, customSegments);
 
     return {
       shortest: {
@@ -200,10 +200,10 @@ class ElevationRouter {
   }
 
   /**
-   * Calculate 10-segment (or N-segment) town-by-town fuel savings,
+   * Calculate N-segment town-by-town fuel savings,
    * average elevation, fastest vs. eco transit times, and traffic area status.
    */
-  calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons = 18, vehicleCategory = '6axle', mileageKml = 3.2, dieselPriceINR = 94.50) {
+  calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons = 18, vehicleCategory = '6axle', mileageKml = 3.2, dieselPriceINR = 94.50, customSegments = 10) {
     const shortestPts = shortestProfile.points || [];
     const ecoPts = ecoProfile.points || [];
     const totalDist = Math.max(shortestProfile.distanceKm || 100, ecoProfile.distanceKm || 100);
@@ -211,8 +211,7 @@ class ElevationRouter {
     const shortestWaypoints = shortestProfile.intermediateCities || [];
     const ecoWaypoints = ecoProfile.intermediateCities || [];
 
-    // Target ~6-10 segment breakdown across the corridor
-    const numSegments = Math.min(10, Math.max(5, Math.round(totalDist / 65)));
+    const numSegments = Math.min(30, Math.max(2, parseInt(customSegments) || 10));
     const segmentedLegs = [];
 
     for (let i = 0; i < numSegments; i++) {

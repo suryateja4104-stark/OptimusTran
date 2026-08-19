@@ -249,12 +249,29 @@ class TransportPlannerApp {
       }
     });
 
-    // Highway Strategy selector
+    // Highway Strategy selector & Mesh Segments Inputs
     const roadPref = document.getElementById('roadRoutePreference');
     roadPref.addEventListener('change', () => {
       this.updateMapRoutes();
       this.recalculateAll();
     });
+
+    const segInputSidebar = document.getElementById('numSegmentsInput');
+    const segInputTable = document.getElementById('numSegmentsTableInput');
+
+    const handleSegChange = (val) => {
+      const num = Math.min(30, Math.max(2, parseInt(val) || 10));
+      if (segInputSidebar) segInputSidebar.value = num;
+      if (segInputTable) segInputTable.value = num;
+      this.recalculateAll();
+    };
+
+    if (segInputSidebar) {
+      segInputSidebar.addEventListener('input', (e) => handleSegChange(e.target.value));
+    }
+    if (segInputTable) {
+      segInputTable.addEventListener('input', (e) => handleSegChange(e.target.value));
+    }
 
     // City Dropdown Selectors
     const origSelect = document.getElementById('originCitySelect');
@@ -648,6 +665,7 @@ class TransportPlannerApp {
     const customMileage = parseFloat(document.getElementById('vehicleMileage').value) || 3.2;
     const dieselRateINR = parseFloat(document.getElementById('dieselRate').value) || 94.50;
     const roadPref = document.getElementById('roadRoutePreference').value;
+    const customSegments = parseInt(document.getElementById('numSegmentsInput').value) || 10;
 
     const elevationData = this.currentCorridor.elevationData;
     
@@ -656,7 +674,9 @@ class TransportPlannerApp {
       elevationData.ecoRoute,
       payloadTons,
       customMileage,
-      dieselRateINR
+      dieselRateINR,
+      '6axle',
+      customSegments
     );
 
     const selectedRoadProfile = (roadPref === 'eco') ? ecoComparison.eco : ecoComparison.shortest;

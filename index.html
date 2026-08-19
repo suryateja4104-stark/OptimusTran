@@ -188,9 +188,9 @@
         </div>
       </div>
 
-      <!-- Road Routing Strategy -->
+      <!-- Road Routing Strategy & Segment Mesh -->
       <div class="panel-section">
-        <h3 class="section-title"><i class="fa-solid fa-mountain-city"></i> Incline Strategy</h3>
+        <h3 class="section-title"><i class="fa-solid fa-mountain-city"></i> Incline & Mesh Strategy</h3>
         
         <div class="input-group">
           <label for="roadRoutePreference">Highway Strategy</label>
@@ -198,6 +198,11 @@
             <option value="eco" selected>Eco-Incline Bypass (Min Climb)</option>
             <option value="shortest">Shortest Distance Highway</option>
           </select>
+        </div>
+
+        <div class="input-group" style="margin-top: 0.65rem;">
+          <label for="numSegmentsInput">Town Mesh Segments</label>
+          <input type="number" id="numSegmentsInput" value="10" min="2" max="30" step="1" title="Number of intermediate city/town legs to divide corridor into">
         </div>
       </div>
 
@@ -331,11 +336,17 @@
           <div class="segment-breakdown-container">
             <div class="segment-header-bar">
               <div class="segment-title">
-                <h3><i class="fa-solid fa-route"></i> City-to-Town Leg Breakdown & Traffic Flags (~10km Mesh)</h3>
+                <h3><i class="fa-solid fa-route"></i> City-to-Town Leg Breakdown & Traffic Flags</h3>
                 <span>Segmented fuel consumption, average elevation, fastest vs. eco times, and traffic density</span>
               </div>
-              <div class="segment-kpi-pills" id="segmentKpiPills">
-                <!-- Populated dynamically -->
+              <div class="segment-controls-wrapper" style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">
+                  <label for="numSegmentsTableInput"><i class="fa-solid fa-sliders"></i> Segments Mesh:</label>
+                  <input type="number" id="numSegmentsTableInput" value="10" min="2" max="30" step="1" style="width: 65px; padding: 0.3rem 0.5rem; font-size: 0.82rem; font-weight: 700; border-radius: var(--radius-sm);">
+                </div>
+                <div class="segment-kpi-pills" id="segmentKpiPills">
+                  <!-- Populated dynamically -->
+                </div>
               </div>
             </div>
 
