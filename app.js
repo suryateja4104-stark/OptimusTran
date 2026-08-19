@@ -46,18 +46,20 @@ class TransportPlannerApp {
     const origSelect = document.getElementById('originCitySelect');
     const destSelect = document.getElementById('destCitySelect');
 
+    if (!origSelect || !destSelect) return;
+
     origSelect.innerHTML = '';
     destSelect.innerHTML = '';
 
     this.cities.forEach(city => {
       const opt1 = document.createElement('option');
       opt1.value = city.id;
-      opt1.innerText = city.name;
+      opt1.textContent = city.name;
       if (city.id === 'hyd') opt1.selected = true;
 
       const opt2 = document.createElement('option');
       opt2.value = city.id;
-      opt2.innerText = city.name;
+      opt2.textContent = city.name;
       if (city.id === 'che') opt2.selected = true;
 
       origSelect.appendChild(opt1);
