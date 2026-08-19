@@ -20,15 +20,67 @@ class ElevationRouter {
   }
 
   /**
-   * Analyze an elevation profile array
+   * CMVR / Motor Vehicles Act Post-2018 Gross Weight Limits Fuel Model
+   * Evaluates fuel consumption C (mL/km) and converts to Indian practice Mileage (km/L) = 1000 / C.
+   * 
+   * @param {number} W Gross Vehicle Weight in Tons (Tare + Payload)
+   * @param {number} S Slope / Grade % (0-7%)
+   * @param {number} V Speed in km/h
+   * @param {string} vehicleCategory '6axle' (6-axle MAV/trailer up to 49t-52t GVW) or '2axle' (2/3-axle rigid truck)
    */
-  analyzeProfile(profilePoints, payloadTons = 18) {
+  calculateCMVRFuelConsumption(W, S, V, vehicleCategory = '6axle') {
+    const slope = Math.max(0, S);
+    let C = 0; // mL / km
+
+    if (vehicleCategory === '6axle') {
+      if (slope >= 2.0) {
+        // 6-axle MAV Ghat / Hill sections (slope 2-7%), speed V: 25-35 km/h
+        const speed = Math.min(35, Math.max(25, V || 30));
+        C = -49.32 * W + 30.24 * speed + 20.69 * (W * slope) + 0.355 * Math.pow(W, 2) 
+            - 24.96 * Math.pow(slope, 2) - 0.515 * Math.pow(speed, 2) - 0.0218 * (Math.pow(W, 2) * Math.pow(slope, 2));
+      } else {
+        // 6-axle MAV Plains / Highway (slope < 2%), speed V: 40-60 km/h
+        const speed = Math.min(60, Math.max(40, V || 50));
+        C = 11.67 * W - 1.79 * speed + 2.95 * (W * slope) + 0.0932 * (W * speed) - 0.136 * Math.pow(W, 2);
+      }
+    } else {
+      // 2/3-axle rigid truck
+      if (slope >= 2.0) {
+        // 2/3-axle Rigid Ghat sections (2-7%), speed V: 25-45 km/h
+        const speed = Math.min(45, Math.max(25, V || 35));
+        C = -8.01 * W + 105.64 * slope - 3.65 * speed + 15.20 * (W * slope) 
+            - 20.51 * Math.pow(slope, 2) - 0.027 * (Math.pow(W, 2) * Math.pow(slope, 2));
+      } else {
+        // 2/3-axle Rigid Plains (0.6-2%), speed V: 50-70 km/h
+        const speed = Math.min(70, Math.max(50, V || 60));
+        C = 14.60 * W + 38.80 * slope + 2.48 * speed - 0.208 * (W * speed) 
+            - 1.245 * (slope * speed) + 0.135 * (W * slope * speed);
+      }
+    }
+
+    // Ensure non-negative consumption
+    C = Math.max(15, C);
+    const mileageKml = 1000 / C; // Convert mL/km to km/L
+
+    return {
+      c_ml_per_km: Math.round(C * 10) / 10,
+      mileageKml: Math.round(mileageKml * 100) / 100
+    };
+  }
+
+  /**
+   * Analyze an elevation profile array using potential energy physics & CMVR empirical fuel models
+   */
+  analyzeProfile(profilePoints, payloadTons = 18, vehicleCategory = '6axle') {
     if (!profilePoints || profilePoints.length < 2) {
       return {
         totalClimbMeters: 0,
         maxGrade: 0,
         avgGrade: 0,
         extraFuelLiters: 0,
+        cmvrBaselineKml: 3.2,
+        cmvrGhatConsumptionMlKm: 0,
+        cmvrExtraFuelPenaltyPercent: 0,
         steepClimbsCount: 0,
         segments: []
       };
@@ -75,11 +127,17 @@ class ElevationRouter {
     const avgGrade = Math.round((sumGrades / (profilePoints.length - 1)) * 10) / 10;
 
     // Incline Physics Work Model: W = m * g * h
-    const totalMassKg = (this.tareWeightTons + payloadTons) * 1000;
+    const grossWeightTons = this.tareWeightTons + payloadTons;
+    const totalMassKg = grossWeightTons * 1000;
     const potentialEnergyJoules = totalMassKg * this.gravityAcc * totalClimb;
     const potentialEnergyMJ = potentialEnergyJoules / 1000000;
     
     const fuelLitersForClimb = potentialEnergyMJ / (this.fuelEnergyPerLiter * this.truckEfficiency);
+
+    // CMVR Post-2018 Empirical Fuel & Penalty Calculations
+    const plainCMVR = this.calculateCMVRFuelConsumption(grossWeightTons, Math.min(1.5, avgGrade), 50, vehicleCategory);
+    const ghatCMVR = this.calculateCMVRFuelConsumption(grossWeightTons, Math.max(2.5, maxGrade), 30, vehicleCategory);
+    const cmvrPenaltyPercent = Math.round(((ghatCMVR.c_ml_per_km - plainCMVR.c_ml_per_km) / plainCMVR.c_ml_per_km) * 100);
 
     return {
       totalClimbMeters: Math.round(totalClimb),
@@ -87,6 +145,11 @@ class ElevationRouter {
       avgGrade,
       steepClimbsCount: steepCount,
       extraFuelLiters: Math.round(fuelLitersForClimb * 10) / 10,
+      cmvrPlainsConsumptionMlKm: plainCMVR.c_ml_per_km,
+      cmvrPlainsMileageKml: plainCMVR.mileageKml,
+      cmvrGhatConsumptionMlKm: ghatCMVR.c_ml_per_km,
+      cmvrGhatMileageKml: ghatCMVR.mileageKml,
+      cmvrExtraFuelPenaltyPercent: Math.max(0, cmvrPenaltyPercent),
       segments
     };
   }
@@ -94,9 +157,9 @@ class ElevationRouter {
   /**
    * Compare Shortest Route vs. Eco-Incline Route
    */
-  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50) {
-    const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons);
-    const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons);
+  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50, vehicleCategory = '6axle') {
+    const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons, vehicleCategory);
+    const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons, vehicleCategory);
 
     const shortestDistFuel = shortestProfile.distanceKm / mileageKml;
     const ecoDistFuel = ecoProfile.distanceKm / mileageKml;

@@ -33,7 +33,7 @@
       </div>
       <div class="logo-text">
         <h1>OptiFreight India</h1>
-        <span>Logistics & Seaways Engine</span>
+        <span>Logistics & Multi-Modal Engine</span>
       </div>
     </div>
 
@@ -283,8 +283,8 @@
       <!-- Multi-Modal Comparison Cards Grid -->
       <section class="section-container">
         <div class="section-header">
-          <h2><i class="fa-solid fa-scale-balanced"></i> Indian Multi-Modal Freight Breakdown (Road, Rail, Air, Seaways)</h2>
-          <span>Side-by-side comparison across all 4 modes in Indian Rupees (₹)</span>
+          <h2><i class="fa-solid fa-scale-balanced"></i> Indian Multi-Modal Freight Breakdown (Road, Rail, Air)</h2>
+          <span>Side-by-side comparison across all 3 modes in Indian Rupees (₹)</span>
         </div>
 
         <div class="modal-cards-grid" id="modalCardsGrid">
@@ -315,6 +315,7 @@
                   <th>Distance (km)</th>
                   <th>Total Climb (m)</th>
                   <th>Max Grade</th>
+                  <th>CMVR Mileage (km/L)</th>
                   <th>Est. Diesel (L)</th>
                   <th>Fuel Cost (₹)</th>
                   <th>Total Freight Cost (₹)</th>
@@ -388,21 +389,6 @@
           </div>
         </div>
 
-        <!-- Section 4: Coastal Seaways Benchmarks -->
-        <div class="logic-card">
-          <h4><i class="fa-solid fa-ship"></i> 4. Coastal Seaways Barges Benchmarks</h4>
-          <div class="input-grid-2">
-            <div class="input-group">
-              <label for="assumpSeaPortFee">Port & Feeder Drayage Fee (₹)</label>
-              <input type="number" id="assumpSeaPortFee" value="6800" step="500">
-            </div>
-            <div class="input-group">
-              <label for="assumpSeaLinehaul">Linehaul Rate (₹ / Ton-Km)</label>
-              <input type="number" id="assumpSeaLinehaul" value="0.42" step="0.02">
-            </div>
-          </div>
-        </div>
-
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" id="btnResetAssumptions">Reset Benchmarks</button>
@@ -431,17 +417,7 @@
         </div>
 
         <div class="logic-card">
-          <h4><i class="fa-solid fa-ship"></i> 2. Coastal Seaways Shipping Formula (Sagarmala Corridor)</h4>
-          <p>Coastal shipping provides the lowest cost and lowest emissions (14g CO₂/ton-km) for coastal city corridors via coastal barges and container feeder vessels.</p>
-          <div class="formula-box">
-            <code>Coastal Distance (km) = Road Distance × 1.12 Nautical Margin</code><br>
-            <code>Sea Linehaul Cost (₹) = Coastal Distance × Chargeable Weight × ₹0.42 / Ton-Km</code><br>
-            <code>Total Seaways Freight (₹) = ₹6,800 Port Handling & Feeder Fee + Sea Linehaul</code>
-          </div>
-        </div>
-
-        <div class="logic-card">
-          <h4><i class="fa-solid fa-mountain"></i> 3. Eco-Incline Ascent Physics & Fuel Penalty Formula</h4>
+          <h4><i class="fa-solid fa-mountain"></i> 2. Eco-Incline Ascent Physics & Fuel Penalty Formula</h4>
           <p>Climbing steep inclines consumes extra fuel due to potential energy work ($W = m \cdot g \cdot h$) against gravity and thermal powertrain losses.</p>
           <div class="formula-box">
             <code>Gross Mass (kg) = (Tare Vehicle Weight 12T + Cargo Payload) × 1000</code><br>
@@ -452,7 +428,23 @@
         </div>
 
         <div class="logic-card">
-          <h4><i class="fa-solid fa-train"></i> 4. Indian Railways Freight Formula (IRCTC / CONCOR Tariff)</h4>
+          <h4><i class="fa-solid fa-truck-ramp-box"></i> 3. CMVR Post-2018 Empirical Fuel & Mileage Model (India MAV / Rigid)</h4>
+          <p>Under India's Motor Vehicles Act / CMVR gross weight limits (post-2018 revision), 6-axle articulated trucks (C3S3 model up to ~49t-52t GVW) and 2/3-axle rigid trucks follow empirical fuel consumption equations $C$ (mL/km) converted to Indian standard practice Mileage (km/L):</p>
+          <div class="formula-box">
+            <code><strong>Mileage (km/L)</strong> = 1000 / C (mL/km)</code><br><br>
+            <strong>6-Axle MAV / Trailer (C3S3 Model, W = Gross Weight in Tons, S = Slope %, V = Speed km/h):</strong><br>
+            <code>• Ghat/Hill (S: 2–7%, V: 25–35 km/h): C = -49.32W + 30.24V + 20.69(WS) + 0.355W² - 24.96S² - 0.515V² - 0.0218(W²S²)</code><br>
+            <code>• Plains/Highway (S &lt; 2%, V: 40–60 km/h): C = 11.67W - 1.79V + 2.95(WS) + 0.0932(WV) - 0.136W²</code><br><br>
+            <strong>2/3-Axle Rigid Truck (W = Gross Weight in Tons, S = Slope %, V = Speed km/h):</strong><br>
+            <code>• Ghat/Hill (S: 2–7%, V: 25–45 km/h): C = -8.01W + 105.64S - 3.65V + 15.20(WS) - 20.51S² - 0.027(W²S²)</code><br>
+            <code>• Plains (S: 0.6–2%, V: 50–70 km/h): C = 14.60W + 38.80S + 2.48V - 0.208(WV) - 1.245(SV) + 0.135(WSV)</code><br><br>
+            <strong>Slope Fuel Penalty %:</strong><br>
+            <code>Extra Fuel % = [ ( C(S₂) - C(S₁) ) / C(S₁) ] × 100</code>
+          </div>
+        </div>
+
+        <div class="logic-card">
+          <h4><i class="fa-solid fa-train"></i> 5. Indian Railways Freight Formula (IRCTC / CONCOR Tariff)</h4>
           <p>Rail freight charges are computed siding-to-siding based on weight thresholds and distance class tiers.</p>
           <div class="formula-box">
             <code>Chargeable Weight (Tons) = Max(Payload Tons, 10 Tons Threshold)</code><br>
@@ -463,7 +455,7 @@
         </div>
 
         <div class="logic-card">
-          <h4><i class="fa-solid fa-plane"></i> 5. Air Freight Volumetric & Chargeable Weight Rating</h4>
+          <h4><i class="fa-solid fa-plane"></i> 6. Air Freight Volumetric & Chargeable Weight Rating</h4>
           <p>IATA standard dimensional weight formula determines whether cargo rate is charged on actual weight or volumetric size.</p>
           <div class="formula-box">
             <code>Cargo Volume (m³) = Length (m) × Width (m) × Height (m)</code><br>

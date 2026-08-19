@@ -64,13 +64,6 @@ class TransportEngine {
         fixedGroundTimeHours: 5,
         avgSpeedKmh: 650,
         co2GramsPerTonKm: 520
-      },
-      seaways: {
-        portHandlingFeeINR: 6800,
-        linehaulRatePerTonKmINR: 0.42,
-        fixedPortTimeHours: 14,
-        avgSpeedKmh: 22,
-        co2GramsPerTonKm: 14
       }
     };
   }
@@ -84,9 +77,6 @@ class TransportEngine {
 
     if (customAssumptions.airHandlingFee) this.rates.air.handlingFeeINR = parseFloat(customAssumptions.airHandlingFee);
     if (customAssumptions.airLinehaulRate) this.rates.air.ratePerChargeableKgPerKmINR = parseFloat(customAssumptions.airLinehaulRate);
-
-    if (customAssumptions.seaPortFee) this.rates.seaways.portHandlingFeeINR = parseFloat(customAssumptions.seaPortFee);
-    if (customAssumptions.seaLinehaulRate) this.rates.seaways.linehaulRatePerTonKmINR = parseFloat(customAssumptions.seaLinehaulRate);
   }
 
   calculateCargoMetrics(payloadTons, lengthM, widthM, heightM) {
@@ -99,7 +89,6 @@ class TransportEngine {
     const airChargeableKg = Math.max(actualWeightKg, airVolumetricKg);
     const roadChargeableKg = Math.max(actualWeightKg, roadVolumetricKg);
     const railChargeableTons = Math.max(payloadTons, this.rates.rail.minChargeableTons);
-    const seaChargeableTons = Math.max(payloadTons, 15);
 
     return {
       actualWeightKg,
@@ -110,7 +99,6 @@ class TransportEngine {
       airChargeableKg: Math.round(airChargeableKg),
       roadChargeableKg: Math.round(roadChargeableKg),
       railChargeableTons,
-      seaChargeableTons,
       isDimensionalOverweight: (airVolumetricKg > actualWeightKg)
     };
   }
@@ -176,18 +164,10 @@ class TransportEngine {
     const airTransitHours = Math.round((roadSelectedDistance / this.rates.air.avgSpeedKmh + this.rates.air.fixedGroundTimeHours) * 10) / 10;
     const airCO2Tons = Math.round((roadSelectedDistance * effectiveTons * this.rates.air.co2GramsPerTonKm / 1000000) * 100) / 100;
 
-    // --- 4. SEAWAYS / COASTAL WATERWAYS ---
-    const seaDistanceKm = Math.round(roadSelectedDistance * 1.12);
-    const seaLinehaul = seaDistanceKm * cargo.seaChargeableTons * this.rates.seaways.linehaulRatePerTonKmINR;
-    const totalSeaCostINR = Math.round(this.rates.seaways.portHandlingFeeINR + seaLinehaul);
-    const seaTransitHours = Math.round((seaDistanceKm / this.rates.seaways.avgSpeedKmh + this.rates.seaways.fixedPortTimeHours) * 10) / 10;
-    const seaCO2Tons = Math.round((seaDistanceKm * effectiveTons * this.rates.seaways.co2GramsPerTonKm / 1000000) * 100) / 100;
-
     const modes = [
       { id: 'road', name: 'Road Freight', costINR: totalRoadCostINR, timeHours: roadTransitHours, co2Tons: roadCO2Tons, icon: 'fa-truck' },
       { id: 'rail', name: 'Indian Rail Freight', costINR: totalRailCostINR, timeHours: railTransitHours, co2Tons: railCO2Tons, icon: 'fa-train' },
-      { id: 'air', name: 'Air Cargo Express', costINR: totalAirCostINR, timeHours: airTransitHours, co2Tons: airCO2Tons, icon: 'fa-plane' },
-      { id: 'seaways', name: 'Coastal Seaways (Sagarmala)', costINR: totalSeaCostINR, timeHours: seaTransitHours, co2Tons: seaCO2Tons, icon: 'fa-ship' }
+      { id: 'air', name: 'Air Cargo Express', costINR: totalAirCostINR, timeHours: airTransitHours, co2Tons: airCO2Tons, icon: 'fa-plane' }
     ];
 
     modes.forEach(m => {
@@ -240,11 +220,6 @@ class TransportEngine {
         costINR: totalAirCostINR,
         timeHours: airTransitHours,
         co2Tons: airCO2Tons
-      },
-      seaways: {
-        costINR: totalSeaCostINR,
-        timeHours: seaTransitHours,
-        co2Tons: seaCO2Tons
       },
       recommendedModeId: recommendedMode.id,
       recommendedModeName: recommendedMode.name,

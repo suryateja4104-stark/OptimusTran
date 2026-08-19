@@ -292,9 +292,7 @@ class TransportPlannerApp {
         railSidingFee: document.getElementById('assumpRailSidingFee').value,
         railLinehaulRate: document.getElementById('assumpRailLinehaul').value,
         airHandlingFee: document.getElementById('assumpAirHandlingFee').value,
-        airLinehaulRate: document.getElementById('assumpAirLinehaul').value,
-        seaPortFee: document.getElementById('assumpSeaPortFee').value,
-        seaLinehaulRate: document.getElementById('assumpSeaLinehaul').value
+        airLinehaulRate: document.getElementById('assumpAirLinehaul').value
       });
 
       assumptionsModal.classList.remove('active');
@@ -309,8 +307,6 @@ class TransportPlannerApp {
       document.getElementById('assumpRailLinehaul').value = 1.45;
       document.getElementById('assumpAirHandlingFee').value = 3500;
       document.getElementById('assumpAirLinehaul').value = 0.048;
-      document.getElementById('assumpSeaPortFee').value = 6800;
-      document.getElementById('assumpSeaLinehaul').value = 0.42;
 
       this.elevationRouter.updatePhysicsParameters({
         truckEfficiency: 0.38,
@@ -322,9 +318,7 @@ class TransportPlannerApp {
         railSidingFee: 4500,
         railLinehaulRate: 1.45,
         airHandlingFee: 3500,
-        airLinehaulRate: 0.048,
-        seaPortFee: 6800,
-        seaLinehaulRate: 0.42
+        airLinehaulRate: 0.048
       });
 
       assumptionsModal.classList.remove('active');
@@ -690,13 +684,11 @@ class TransportPlannerApp {
       const isRoad = (mode.id === 'road');
       const isRail = (mode.id === 'rail');
       const isAir = (mode.id === 'air');
-      const isSea = (mode.id === 'seaways');
 
       let iconClass = 'fa-truck';
       let tagText = `${evaluation.vehicle.name}`;
       if (isRail) { iconClass = 'fa-train'; tagText = 'Indian Railways Siding Freight'; }
       if (isAir) { iconClass = 'fa-plane'; tagText = 'Domestic Air Cargo Express'; }
-      if (isSea) { iconClass = 'fa-ship'; tagText = 'Coastal Waterways Barges (Sagarmala)'; }
 
       const card = document.createElement('div');
       card.className = `modal-card ${isRecommended ? 'is-best' : ''}`;
@@ -748,6 +740,9 @@ class TransportPlannerApp {
     const sFuelCost = Math.round(s.totalFuelLiters * dieselRateINR);
     const eFuelCost = Math.round(e.totalFuelLiters * dieselRateINR);
 
+    const sKml = s.analysis.cmvrGhatMileageKml || s.analysis.cmvrPlainsMileageKml || 3.2;
+    const eKml = e.analysis.cmvrGhatMileageKml || e.analysis.cmvrPlainsMileageKml || 3.5;
+
     const tbody = document.getElementById('ecoTableBody');
     tbody.innerHTML = `
       <tr style="background: rgba(225, 29, 72, 0.05);">
@@ -755,6 +750,7 @@ class TransportPlannerApp {
         <td>${s.distanceKm} km</td>
         <td><strong style="color: #e11d48;">${s.analysis.totalClimbMeters} m</strong></td>
         <td>${s.analysis.maxGrade}%</td>
+        <td><span title="Ghat Slope Consumption Penalty: +${s.analysis.cmvrExtraFuelPenaltyPercent}% fuel">${sKml} km/L (+${s.analysis.cmvrExtraFuelPenaltyPercent}% Ghat Penalty)</span></td>
         <td>${s.totalFuelLiters} L</td>
         <td>₹${sFuelCost.toLocaleString('en-IN')}</td>
         <td>₹${(sFuelCost + 12000).toLocaleString('en-IN')}</td>
@@ -764,6 +760,7 @@ class TransportPlannerApp {
         <td>${e.distanceKm} km</td>
         <td><strong style="color: #059669;">${e.analysis.totalClimbMeters} m</strong></td>
         <td>${e.analysis.maxGrade}%</td>
+        <td><strong style="color: #059669;">${eKml} km/L (Optimized)</strong></td>
         <td><strong style="color: #059669;">${e.totalFuelLiters} L</strong></td>
         <td><strong style="color: #059669;">₹${eFuelCost.toLocaleString('en-IN')}</strong></td>
         <td><strong style="color: #059669;">₹${(eFuelCost + 12000).toLocaleString('en-IN')}</strong></td>
