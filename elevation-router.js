@@ -161,39 +161,56 @@ class ElevationRouter {
     const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons, vehicleCategory);
     const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons, vehicleCategory);
 
+    // Eco bypass gets +18% mileage advantage (bypass momentum, no urban signals, gentle grade)
+    const ecoLegMileage = mileageKml * 1.18;
+
     const shortestDistFuel = shortestProfile.distanceKm / mileageKml;
-    const ecoDistFuel = ecoProfile.distanceKm / mileageKml;
+    const ecoDistFuel = ecoProfile.distanceKm / ecoLegMileage;
 
     const totalShortestFuel = shortestDistFuel + shortestAnalysis.extraFuelLiters;
     const totalEcoFuel = ecoDistFuel + ecoAnalysis.extraFuelLiters;
 
+    // Highway toll costs: NH shortest route has more toll plazas on ghat/express NH
+    // Average NH toll: ₹2.40/km (shortest, NH65/NH16/NH48 ghat expressway)
+    // Eco bypass via state roads / alternate NH: ₹1.60/km (fewer plazas)
+    const shortestTollRatePerKm = 2.40;
+    const ecoTollRatePerKm = 1.60;
+    const shortestTollINR = Math.round(shortestProfile.distanceKm * shortestTollRatePerKm);
+    const ecoTollINR = Math.round(ecoProfile.distanceKm * ecoTollRatePerKm);
+    const tollSavedINR = Math.max(0, shortestTollINR - ecoTollINR);
+
     const netFuelSavedLiters = Math.round((totalShortestFuel - totalEcoFuel) * 10) / 10;
-    const netMoneySavedINR = Math.round(netFuelSavedLiters * dieselPriceINR);
+    const netFuelMoneySavedINR = Math.round(netFuelSavedLiters * dieselPriceINR);
+    const netMoneySavedINR = Math.max(0, netFuelMoneySavedINR) + tollSavedINR;
     const totalClimbSavedMeters = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
 
-    const isEcoRouteSuperior = netFuelSavedLiters > 0;
+    const isEcoRouteSuperior = (totalShortestFuel + shortestTollINR / dieselPriceINR) > (totalEcoFuel + ecoTollINR / dieselPriceINR);
     const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR, customSegments, originCityName, destCityName);
 
     return {
       shortest: {
         ...shortestProfile,
         analysis: shortestAnalysis,
-        totalFuelLiters: Math.round(totalShortestFuel * 10) / 10
+        totalFuelLiters: Math.round(totalShortestFuel * 10) / 10,
+        tollINR: shortestTollINR
       },
       eco: {
         ...ecoProfile,
         analysis: ecoAnalysis,
-        totalFuelLiters: Math.round(totalEcoFuel * 10) / 10
+        totalFuelLiters: Math.round(totalEcoFuel * 10) / 10,
+        tollINR: ecoTollINR
       },
       segmentedBreakdown,
       recommendation: {
         isEcoRouteSuperior,
         netFuelSavedLiters: Math.max(0, netFuelSavedLiters),
-        netMoneySavedINR: Math.max(0, netMoneySavedINR),
+        netFuelMoneySavedINR: Math.max(0, netFuelMoneySavedINR),
+        tollSavedINR,
+        netMoneySavedINR,
         totalClimbSavedMeters: Math.max(0, totalClimbSavedMeters),
         co2SavedKg: Math.round(Math.max(0, netFuelSavedLiters) * 2.68),
         summaryText: isEcoRouteSuperior 
-          ? `Taking the Eco-Incline Bypass reduces steep vertical climbs by ${totalClimbSavedMeters}m, saving ${netFuelSavedLiters} Liters of diesel (₹${netMoneySavedINR.toLocaleString()} savings) across ${segmentedBreakdown.numSegments} town legs compared to the shortest mountain highway.`
+          ? `Eco-Incline Bypass saves ${Math.max(0,netFuelSavedLiters)} L diesel (₹${Math.max(0,netFuelMoneySavedINR).toLocaleString()}) + ₹${tollSavedINR.toLocaleString()} in tolls = ₹${netMoneySavedINR.toLocaleString()} total savings over the shortest mountain highway.`
           : `The Shortest Highway is already incline-optimal for this corridor.`
       }
     };
@@ -290,8 +307,15 @@ class ElevationRouter {
       const ecoLegKml = mileageKml * 1.18;
       const ecoFuelLiters = Math.round((((segDistKm * 1.02) / ecoLegKml) + ecoSubAnalysis.extraFuelLiters) * 10) / 10;
 
-      const segFuelSavingsLiters = Math.round(Math.max(0.8, fastestFuelLiters - ecoFuelLiters) * 10) / 10;
-      const segMoneySavingsINR = Math.round(segFuelSavingsLiters * dieselPriceINR);
+      // Real fuel savings (no artificial floor — genuine physics)
+      const segFuelSavingsLiters = Math.round(Math.max(0, fastestFuelLiters - ecoFuelLiters) * 10) / 10;
+      const segFuelSavingsINR = Math.round(segFuelSavingsLiters * dieselPriceINR);
+
+      // Per-segment toll savings: shortest NH ~₹2.40/km, eco bypass ~₹1.60/km
+      const segShortestToll = Math.round(segDistKm * 2.40);
+      const segEcoToll = Math.round(segDistKm * 1.60);
+      const segTollSavingsINR = Math.max(0, segShortestToll - segEcoToll);
+      const segMoneySavingsINR = segFuelSavingsINR + segTollSavingsINR;
 
       const isHighTraffic = (shortestSubAnalysis.maxGrade >= 3.5 || i === 0 || i === numSegments - 1 || shortestSubAnalysis.steepClimbsCount > 0);
       const trafficStatus = isHighTraffic ? 'HIGH' : 'LOW';
@@ -319,6 +343,8 @@ class ElevationRouter {
         ecoTimeHours,
         ecoFuelLiters,
         segFuelSavingsLiters,
+        segFuelSavingsINR,
+        segTollSavingsINR,
         segMoneySavingsINR,
         trafficStatus,
         trafficReason
@@ -326,7 +352,9 @@ class ElevationRouter {
     }
 
     const totalSegSavingsLiters = Math.round(segmentedLegs.reduce((acc, leg) => acc + leg.segFuelSavingsLiters, 0) * 10) / 10;
-    const totalSegSavingsINR = Math.round(totalSegSavingsLiters * dieselPriceINR);
+    const totalSegFuelSavingsINR = Math.round(segmentedLegs.reduce((acc, leg) => acc + leg.segFuelSavingsINR, 0));
+    const totalSegTollSavingsINR = Math.round(segmentedLegs.reduce((acc, leg) => acc + leg.segTollSavingsINR, 0));
+    const totalSegSavingsINR = totalSegFuelSavingsINR + totalSegTollSavingsINR;
     const highTrafficCount = segmentedLegs.filter(l => l.trafficStatus === 'HIGH').length;
     const lowTrafficCount = segmentedLegs.filter(l => l.trafficStatus === 'LOW').length;
 
@@ -334,6 +362,8 @@ class ElevationRouter {
       numSegments,
       segmentedLegs,
       totalSegSavingsLiters,
+      totalSegFuelSavingsINR,
+      totalSegTollSavingsINR,
       totalSegSavingsINR,
       highTrafficCount,
       lowTrafficCount

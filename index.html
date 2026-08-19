@@ -380,8 +380,8 @@
               </div>
             </div>
 
-            <div class="eco-comparison-table-wrapper">
-              <table class="eco-table segment-table">
+            <div class="eco-comparison-table-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+              <table class="eco-table segment-table" style="min-width: 900px;">
                 <thead>
                   <tr>
                     <th>Leg #</th>
@@ -391,7 +391,9 @@
                     <th>Traffic Status</th>
                     <th>Fastest Route (Time & Fuel)</th>
                     <th>Fuel Efficient Route (Time & Fuel)</th>
-                    <th>Leg Savings (L & ₹)</th>
+                    <th>Fuel Savings (L & ₹)</th>
+                    <th>Toll Savings (₹)</th>
+                    <th>Total Savings (₹)</th>
                   </tr>
                 </thead>
                 <tbody id="segmentTableBody">
@@ -576,9 +578,9 @@
   </div>
 
   <!-- Scripts with Cache-Busting Versioning -->
-  <script src="city-data.js?v=6.0.0"></script>
-  <script src="transport-engine.js?v=6.0.0"></script>
-  <script src="elevation-router.js?v=6.0.0"></script>
-  <script src="app.js?v=6.0.0"></script>
+  <script src="city-data.js?v=7.0.0"></script>
+  <script src="transport-engine.js?v=7.0.0"></script>
+  <script src="elevation-router.js?v=7.0.0"></script>
+  <script src="app.js?v=7.0.0"></script>
 </body>
 </html>

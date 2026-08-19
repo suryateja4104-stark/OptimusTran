@@ -833,9 +833,10 @@ class TransportPlannerApp {
 
     const savedFuel = ecoComparison.recommendation.netFuelSavedLiters;
     const savedMoneyINR = ecoComparison.recommendation.netMoneySavedINR;
+    const tollSaved = ecoComparison.recommendation.tollSavedINR || 0;
 
-    document.getElementById('kpiEcoSavings').innerText = `${savedFuel} L`;
-    document.getElementById('kpiEcoSavingsSub').innerText = `Save ₹${savedMoneyINR.toLocaleString('en-IN')} by avoiding climbs`;
+    document.getElementById('kpiEcoSavings').innerText = `${savedFuel} L + \u20b9${tollSaved.toLocaleString('en-IN')} tolls`;
+    document.getElementById('kpiEcoSavingsSub').innerText = `Total ₹${savedMoneyINR.toLocaleString('en-IN')} saved (fuel + tolls)`;
   }
 
   renderModalCards(evaluation) {
@@ -902,9 +903,29 @@ class TransportPlannerApp {
 
     const sFuelCost = Math.round(s.totalFuelLiters * dieselRateINR);
     const eFuelCost = Math.round(e.totalFuelLiters * dieselRateINR);
+    const sToll = s.tollINR || 0;
+    const eToll = e.tollINR || 0;
+    const sTotalCost = sFuelCost + sToll + 12000;
+    const eTotalCost = eFuelCost + eToll + 12000;
+    const totalSaving = Math.max(0, sTotalCost - eTotalCost);
 
     const sKml = s.analysis.cmvrGhatMileageKml || s.analysis.cmvrPlainsMileageKml || 3.2;
-    const eKml = e.analysis.cmvrGhatMileageKml || e.analysis.cmvrPlainsMileageKml || 3.5;
+    const eKml = (parseFloat(document.getElementById('vehicleMileage').value) || 3.2) * 1.18;
+
+    const thead = document.querySelector('#ecoTableBody')?.closest('table')?.querySelector('thead tr');
+    if (thead && thead.children.length < 9) {
+      thead.innerHTML = `
+        <th>Route Option</th>
+        <th>Distance (km)</th>
+        <th>Total Climb (m)</th>
+        <th>Max Grade</th>
+        <th>CMVR Mileage (km/L)</th>
+        <th>Est. Diesel (L)</th>
+        <th>Fuel Cost (₹)</th>
+        <th>Toll Cost (₹)</th>
+        <th>Total Freight Cost (₹)</th>
+      `;
+    }
 
     const tbody = document.getElementById('ecoTableBody');
     tbody.innerHTML = `
@@ -916,17 +937,25 @@ class TransportPlannerApp {
         <td><span title="Ghat Slope Consumption Penalty: +${s.analysis.cmvrExtraFuelPenaltyPercent}% fuel">${sKml} km/L (+${s.analysis.cmvrExtraFuelPenaltyPercent}% Ghat Penalty)</span></td>
         <td>${s.totalFuelLiters} L</td>
         <td>₹${sFuelCost.toLocaleString('en-IN')}</td>
-        <td>₹${(sFuelCost + 12000).toLocaleString('en-IN')}</td>
+        <td>₹${sToll.toLocaleString('en-IN')}</td>
+        <td>₹${sTotalCost.toLocaleString('en-IN')}</td>
       </tr>
       <tr style="background: rgba(5, 150, 105, 0.08);">
         <td><strong style="color: #059669;">Eco-Incline Bypass (Gentle Contour) ⭐</strong></td>
         <td>${e.distanceKm} km</td>
         <td><strong style="color: #059669;">${e.analysis.totalClimbMeters} m</strong></td>
         <td>${e.analysis.maxGrade}%</td>
-        <td><strong style="color: #059669;">${eKml} km/L (Optimized)</strong></td>
+        <td><strong style="color: #059669;">${eKml.toFixed(2)} km/L (Optimized)</strong></td>
         <td><strong style="color: #059669;">${e.totalFuelLiters} L</strong></td>
         <td><strong style="color: #059669;">₹${eFuelCost.toLocaleString('en-IN')}</strong></td>
-        <td><strong style="color: #059669;">₹${(eFuelCost + 12000).toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color: #059669;">₹${eToll.toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color: #059669;">₹${eTotalCost.toLocaleString('en-IN')}</strong></td>
+      </tr>
+      <tr style="background: rgba(37,99,235,0.06); border-top: 2px solid rgba(37,99,235,0.25);">
+        <td colspan="6"><strong style="color:#2563eb;">&#127381; Net Savings (Eco vs Shortest)</strong></td>
+        <td><strong style="color:#16a34a;">₹${Math.max(0,sFuelCost-eFuelCost).toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color:#16a34a;">₹${Math.max(0,sToll-eToll).toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color:#16a34a; font-size:1rem;">₹${totalSaving.toLocaleString('en-IN')}</strong></td>
       </tr>
     `;
 
@@ -937,13 +966,20 @@ class TransportPlannerApp {
     const segData = ecoComparison.segmentedBreakdown;
     if (!segData || !segData.segmentedLegs) return;
 
+    const totalFuelSaved = segData.totalSegSavingsLiters;
+    const totalFuelINR = segData.totalSegFuelSavingsINR || 0;
+    const totalTollINR = segData.totalSegTollSavingsINR || 0;
+    const totalSaved = segData.totalSegSavingsINR;
+
     const kpiContainer = document.getElementById('segmentKpiPills');
     if (kpiContainer) {
       kpiContainer.innerHTML = `
         <span class="segment-pill"><i class="fa-solid fa-layer-group"></i> <strong>${segData.numSegments}</strong> Town Legs</span>
         <span class="segment-pill traffic-pill-high"><i class="fa-solid fa-triangle-exclamation"></i> <strong>${segData.highTrafficCount}</strong> High Traffic</span>
         <span class="segment-pill traffic-pill-low"><i class="fa-solid fa-circle-check"></i> <strong>${segData.lowTrafficCount}</strong> Low Traffic</span>
-        <span class="segment-pill segment-pill-savings"><i class="fa-solid fa-piggy-bank"></i> Total Savings: <strong>${segData.totalSegSavingsLiters} L</strong> (₹${segData.totalSegSavingsINR.toLocaleString('en-IN')})</span>
+        <span class="segment-pill segment-pill-savings"><i class="fa-solid fa-gas-pump"></i> Fuel Saved: <strong>${totalFuelSaved} L</strong> (₹${totalFuelINR.toLocaleString('en-IN')})</span>
+        <span class="segment-pill segment-pill-toll"><i class="fa-solid fa-road-barrier"></i> Toll Saved: <strong>₹${totalTollINR.toLocaleString('en-IN')}</strong></span>
+        <span class="segment-pill segment-pill-total-savings"><i class="fa-solid fa-piggy-bank"></i> Total Savings: <strong>₹${totalSaved.toLocaleString('en-IN')}</strong></span>
       `;
     }
 
@@ -953,6 +989,7 @@ class TransportPlannerApp {
     tbody.innerHTML = segData.segmentedLegs.map(leg => {
       const trafficBadgeClass = leg.trafficStatus === 'HIGH' ? 'traffic-badge-high' : 'traffic-badge-low';
       const trafficIcon = leg.trafficStatus === 'HIGH' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+      const hasSavings = leg.segFuelSavingsLiters > 0 || leg.segTollSavingsINR > 0;
 
       return `
         <tr>
@@ -963,7 +1000,9 @@ class TransportPlannerApp {
           <td><span class="traffic-badge ${trafficBadgeClass}"><i class="fa-solid ${trafficIcon}"></i> ${leg.trafficStatus} (${leg.trafficReason})</span></td>
           <td><i class="fa-solid fa-clock"></i> ${leg.fastestTimeHours}h | <i class="fa-solid fa-gas-pump"></i> ${leg.fastestFuelLiters} L</td>
           <td><strong style="color: #059669;"><i class="fa-solid fa-clock"></i> ${leg.ecoTimeHours}h | <i class="fa-solid fa-gas-pump"></i> ${leg.ecoFuelLiters} L</strong></td>
-          <td><strong style="color: #059669;">+${leg.segFuelSavingsLiters} L (₹${leg.segMoneySavingsINR.toLocaleString('en-IN')})</strong></td>
+          <td>${hasSavings ? `<strong style="color:#16a34a;">+${leg.segFuelSavingsLiters} L (₹${(leg.segFuelSavingsINR||0).toLocaleString('en-IN')})</strong>` : `<span style="color:var(--text-muted);">0 L (₹0)</span>`}</td>
+          <td>${leg.segTollSavingsINR > 0 ? `<strong style="color:#2563eb;">₹${leg.segTollSavingsINR.toLocaleString('en-IN')}</strong>` : `<span style="color:var(--text-muted);">-</span>`}</td>
+          <td><strong style="color:#059669; font-size:0.88rem;">₹${leg.segMoneySavingsINR.toLocaleString('en-IN')}</strong></td>
         </tr>
       `;
     }).join('');

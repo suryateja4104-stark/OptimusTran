@@ -1020,3 +1020,27 @@ select:focus, input:focus {
   font-size: 0.82rem;
 }
 
+/* Toll Savings pill */
+.segment-pill-toll {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
+  color: #1d4ed8;
+}
+
+/* Total Savings pill */
+.segment-pill-total-savings {
+  background: rgba(5, 150, 105, 0.12);
+  border-color: rgba(5, 150, 105, 0.35);
+  color: #047857;
+  font-weight: 700;
+}
+
+/* Ensure main eco comparison table also scrolls on small screens */
+.eco-comparison-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.eco-table {
+  min-width: 720px;
+}
