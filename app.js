@@ -140,13 +140,71 @@ class TransportPlannerApp {
         
         const pts = routeObj.points || [];
 
+        // 1. Render Segment Highlight Band if active
+        if (this.selectedSegment && pts.length > 0) {
+          const { segStartKm, segEndKm, legNumber, legName } = this.selectedSegment;
+
+          let startIdx = pts.findIndex(p => p.distanceKm >= segStartKm);
+          let endIdx = pts.findIndex(p => p.distanceKm >= segEndKm);
+          if (startIdx < 0) startIdx = 0;
+          if (endIdx < 0 || endIdx < startIdx) endIdx = pts.length - 1;
+
+          const xStart = x.getPixelForValue(startIdx);
+          const xEnd = x.getPixelForValue(endIdx);
+          const yTop = chart.chartArea.top;
+          const yBottom = chart.chartArea.bottom;
+
+          ctx.save();
+          ctx.fillStyle = 'rgba(37, 99, 235, 0.16)';
+          ctx.fillRect(xStart, yTop, Math.max(4, xEnd - xStart), yBottom - yTop);
+
+          ctx.strokeStyle = '#2563eb';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+
+          ctx.beginPath();
+          ctx.moveTo(xStart, yTop);
+          ctx.lineTo(xStart, yBottom);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(xEnd, yTop);
+          ctx.lineTo(xEnd, yBottom);
+          ctx.stroke();
+
+          ctx.setLineDash([]);
+          const labelText = `📍 Selected Stretch: Leg #${legNumber} (${legName})`;
+          ctx.font = 'bold 11px Inter, sans-serif';
+          const tw = ctx.measureText(labelText).width;
+          const px = Math.min(chart.chartArea.right - 80, Math.max(chart.chartArea.left + 80, (xStart + xEnd) / 2));
+          const py = yTop + 14;
+
+          ctx.fillStyle = '#2563eb';
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(px - tw / 2 - 8, py - 10, tw + 16, 20, 10);
+          } else {
+            ctx.rect(px - tw / 2 - 8, py - 10, tw + 16, 20);
+          }
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, px, py);
+          ctx.restore();
+        }
+
+        // 2. Render 4-level staggered City Callout Tags for ALL Cities
+        const staggeredHeights = [20, 42, 64, 86];
         let calloutIndex = 0;
+
         pts.forEach((pt, index) => {
           if (pt.city) {
             const xPos = x.getPixelForValue(index);
             const yPos = y.getPixelForValue(pt.altitudeMeters);
 
-            const yOffset = (calloutIndex % 2 === 0) ? 22 : 44;
+            const yOffset = staggeredHeights[calloutIndex % staggeredHeights.length];
             calloutIndex++;
 
             ctx.save();
@@ -169,7 +227,7 @@ class TransportPlannerApp {
             ctx.stroke();
 
             const text = pt.city;
-            ctx.font = '600 11px Inter';
+            ctx.font = '600 11px Inter, sans-serif';
             const textWidth = ctx.measureText(text).width;
             const padding = 6;
             const boxWidth = textWidth + padding * 2;
@@ -177,7 +235,7 @@ class TransportPlannerApp {
             const boxX = xPos - boxWidth / 2;
             const boxY = yPos - yOffset - boxHeight;
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
             ctx.beginPath();
             if (ctx.roundRect) {
               ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
@@ -185,8 +243,8 @@ class TransportPlannerApp {
               ctx.rect(boxX, boxY, boxWidth, boxHeight);
             }
             ctx.fill();
-            ctx.strokeStyle = (roadPref === 'eco') ? 'rgba(5, 150, 105, 0.6)' : 'rgba(225, 29, 72, 0.6)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = (roadPref === 'eco') ? 'rgba(5, 150, 105, 0.7)' : 'rgba(225, 29, 72, 0.7)';
+            ctx.lineWidth = 1.2;
             ctx.stroke();
 
             ctx.fillStyle = '#ffffff';
@@ -657,8 +715,10 @@ class TransportPlannerApp {
       ecoInput = elevationData.ecoRoute.waypoints;
     }
 
-    const realShortestCoords = await this.fetchOsrmRoute(shortestInput) || shortestInput;
-    const realEcoCoords = await this.fetchOsrmRoute(ecoInput) || ecoInput;
+    this.realShortestCoords = await this.fetchOsrmRoute(shortestInput) || shortestInput;
+    this.realEcoCoords = await this.fetchOsrmRoute(ecoInput) || ecoInput;
+    const realShortestCoords = this.realShortestCoords;
+    const realEcoCoords = this.realEcoCoords;
 
     this.shortestPolyline = L.polyline(realShortestCoords, {
       color: '#e11d48',
@@ -736,37 +796,61 @@ class TransportPlannerApp {
     this.elevationChart.update();
   }
 
+  assignAllCitiesToProfilePoints(elevationData, waypointsList) {
+    if (!waypointsList || waypointsList.length === 0) return;
+
+    ['shortestRoute', 'ecoRoute'].forEach(routeKey => {
+      const route = elevationData[routeKey];
+      if (!route || !route.points || route.points.length === 0) return;
+
+      const pts = route.points;
+      const totalKm = route.distanceKm || pts[pts.length - 1].distanceKm;
+
+      pts.forEach(p => p.city = null);
+
+      const n = waypointsList.length;
+      waypointsList.forEach((cityName, idx) => {
+        const targetKm = (idx / Math.max(1, n - 1)) * totalKm;
+
+        let closestPt = pts[0];
+        let minDiff = Math.abs(pts[0].distanceKm - targetKm);
+
+        pts.forEach(p => {
+          const diff = Math.abs(p.distanceKm - targetKm);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestPt = p;
+          }
+        });
+
+        closestPt.city = cityName;
+      });
+    });
+  }
+
   renderIntermediateCitiesStrip() {
     const strip = document.getElementById('intermediateCitiesStrip');
-    const roadPref = document.getElementById('roadRoutePreference').value;
+    if (!strip) return;
+
+    const roadPref = document.getElementById('roadRoutePreference') ? document.getElementById('roadRoutePreference').value : 'eco';
     const activeRouteObj = (roadPref === 'eco') 
       ? this.currentCorridor.elevationData.ecoRoute 
       : this.currentCorridor.elevationData.shortestRoute;
 
     const routeTag = (roadPref === 'eco') ? '🟢 Eco Bypass' : '🔴 Shortest Highway';
 
-    strip.innerHTML = `<strong><i class="fa-solid fa-city"></i> ${routeTag} Cities & Elevations:</strong> `;
+    const pts = activeRouteObj.points || [];
+    const cityPoints = pts.filter(p => p.city);
 
-    const cities = [
-      { name: this.originCity.name.split(',')[0], alt: this.originCity.alt }
-    ];
+    if (cityPoints.length === 0) return;
 
-    if (activeRouteObj.intermediateCities) {
-      activeRouteObj.intermediateCities.forEach(c => {
-        cities.push({ name: c.name, alt: c.alt });
-      });
-    }
-
-    cities.push({ name: this.destCity.name.split(',')[0], alt: this.destCity.alt });
-
-    cities.forEach(c => {
-      const badge = document.createElement('span');
-      badge.className = 'city-badge';
-      const isHighTraffic = (c.alt > 350 || c.name.includes('Pass') || c.name.includes('Summit'));
+    const cityBadgesHtml = cityPoints.map(p => {
+      const isHighTraffic = (p.altitudeMeters > 350 || p.city.includes('Pass') || p.city.includes('Summit') || p.city.includes('Ghat'));
       const trafficDot = isHighTraffic ? '🔴 High Traffic' : '🟢 Low Traffic';
-      badge.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${c.name} (${c.alt}m) · <small>${trafficDot}</small>`;
-      strip.appendChild(badge);
-    });
+      return `<span class="city-badge" style="font-size: 0.78rem; border: 1px solid var(--border-subtle); background: var(--bg-card);"><i class="fa-solid fa-location-dot" style="color:${roadPref==='eco'?'#059669':'#e11d48'};"></i> <strong>${p.city}</strong> (${p.altitudeMeters}m) · <small>${trafficDot}</small></span>`;
+    }).join(' ');
+
+    strip.innerHTML = `<strong><i class="fa-solid fa-city"></i> ${routeTag} Corridor Cities (${cityPoints.length}):</strong> ${cityBadgesHtml}`;
   }
 
   recalculateAll() {
@@ -816,6 +900,13 @@ class TransportPlannerApp {
         routeName: selectedRoadProfile.name
       }
     });
+
+    if (ecoComparison.segmentedBreakdown && ecoComparison.segmentedBreakdown.waypointsList) {
+      this.assignAllCitiesToProfilePoints(elevationData, ecoComparison.segmentedBreakdown.waypointsList);
+    }
+
+    this.updateElevationChart(elevationData);
+    this.renderIntermediateCitiesStrip();
 
     this.updateKpiHeader(evaluation, ecoComparison);
     this.renderModalCards(evaluation);
@@ -964,6 +1055,109 @@ class TransportPlannerApp {
     this.renderSegmentedTable(ecoComparison);
   }
 
+  highlightSegmentOnMapAndChart(leg, rowIndex) {
+    const tbody = document.getElementById('segmentTableBody');
+    if (tbody) {
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach(r => r.classList.remove('segment-row-selected'));
+      if (rows[rowIndex]) {
+        rows[rowIndex].classList.add('segment-row-selected');
+      }
+    }
+
+    this.selectedSegment = leg;
+    if (this.elevationChart) {
+      this.elevationChart.update();
+    }
+
+    if (!this.map) return;
+
+    if (this.segmentHighlightLayer) {
+      this.map.removeLayer(this.segmentHighlightLayer);
+      this.segmentHighlightLayer = null;
+    }
+
+    const roadPref = document.getElementById('roadRoutePreference') ? document.getElementById('roadRoutePreference').value : 'eco';
+    const coords = (roadPref === 'eco' && this.realEcoCoords) ? this.realEcoCoords : (this.realShortestCoords || []);
+
+    if (!coords || coords.length === 0) return;
+
+    const totalKm = leg.totalRouteDistanceKm || (this.currentCorridor ? this.currentCorridor.distanceKm : 600);
+    const startRatio = leg.segStartKm / totalKm;
+    const endRatio = leg.segEndKm / totalKm;
+
+    const startIdx = Math.floor(startRatio * (coords.length - 1));
+    const endIdx = Math.min(coords.length - 1, Math.ceil(endRatio * (coords.length - 1)));
+
+    const segCoords = coords.slice(Math.max(0, startIdx), Math.min(coords.length, endIdx + 1));
+    if (segCoords.length < 2) return;
+
+    const group = L.featureGroup();
+
+    const glowLine = L.polyline(segCoords, {
+      color: '#3b82f6',
+      weight: 14,
+      opacity: 0.45,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    const mainLine = L.polyline(segCoords, {
+      color: '#1d4ed8',
+      weight: 6,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    group.addLayer(glowLine);
+    group.addLayer(mainLine);
+
+    const startCoord = segCoords[0];
+    const endCoord = segCoords[segCoords.length - 1];
+
+    const startPin = L.divIcon({
+      className: 'segment-stretch-pin',
+      html: `<div style="background: #2563eb; color: #fff; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px; border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); white-space: nowrap;">📍 Start: ${leg.fromName}</div>`,
+      iconSize: [100, 24]
+    });
+
+    const endPin = L.divIcon({
+      className: 'segment-stretch-pin',
+      html: `<div style="background: #059669; color: #fff; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px; border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); white-space: nowrap;">🏁 End: ${leg.toName}</div>`,
+      iconSize: [100, 24]
+    });
+
+    const m1 = L.marker(startCoord, { icon: startPin });
+    const m2 = L.marker(endCoord, { icon: endPin });
+
+    group.addLayer(m1);
+    group.addLayer(m2);
+
+    group.addTo(this.map);
+    this.segmentHighlightLayer = group;
+
+    const midIdx = Math.floor(segCoords.length / 2);
+    const midCoord = segCoords[midIdx] || startCoord;
+    L.popup({ autoClose: false, closeOnClick: false })
+      .setLatLng(midCoord)
+      .setContent(`
+        <div style="font-family: Inter, sans-serif; padding: 4px;">
+          <strong style="color: #1d4ed8; font-size: 0.92rem;">📍 Leg #${leg.legNumber}: ${leg.legName}</strong><br>
+          <span style="font-size: 0.82rem; color: #475569;">
+            <b>Distance:</b> ${leg.distanceKm} km | <b>Avg Elevation:</b> ${leg.avgElevationMeters} m<br>
+            <b>Traffic Status:</b> <span style="color: ${leg.trafficStatus === 'HIGH' ? '#e11d48' : '#059669'}; font-weight:700;">${leg.trafficStatus} (${leg.trafficReason})</span>
+          </span>
+        </div>
+      `)
+      .openOn(this.map);
+
+    const bounds = group.getBounds();
+    if (bounds.isValid()) {
+      this.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13, animate: true });
+    }
+  }
+
   renderSegmentedTable(ecoComparison) {
     const segData = ecoComparison.segmentedBreakdown;
     if (!segData || !segData.segmentedLegs) return;
@@ -994,9 +1188,9 @@ class TransportPlannerApp {
       const hasSavings = leg.segFuelSavingsLiters > 0 || leg.segTollSavingsINR > 0;
 
       return `
-        <tr>
+        <tr title="Click to highlight #${leg.legNumber} ${leg.legName} stretch on map & elevation graph">
           <td><strong>#${leg.legNumber}</strong></td>
-          <td><strong>${leg.legName}</strong></td>
+          <td><strong>${leg.legName}</strong> <i class="fa-solid fa-arrow-pointer" style="font-size: 0.72rem; color: #3b82f6; margin-left: 4px;" title="Click to highlight stretch on map"></i></td>
           <td>${leg.distanceKm} km</td>
           <td><strong>${leg.avgElevationMeters} m</strong></td>
           <td><span class="traffic-badge ${trafficBadgeClass}"><i class="fa-solid ${trafficIcon}"></i> ${leg.trafficStatus} (${leg.trafficReason})</span></td>
@@ -1008,6 +1202,16 @@ class TransportPlannerApp {
         </tr>
       `;
     }).join('');
+
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((row, idx) => {
+      row.addEventListener('click', () => {
+        const leg = segData.segmentedLegs[idx];
+        if (leg) {
+          this.highlightSegmentOnMapAndChart(leg, idx);
+        }
+      });
+    });
   }
 }
 

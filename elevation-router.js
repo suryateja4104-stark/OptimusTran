@@ -335,6 +335,11 @@ class ElevationRouter {
       segmentedLegs.push({
         legNumber: i + 1,
         legName: `${fromName} ➔ ${toName}`,
+        fromName,
+        toName,
+        segStartKm,
+        segEndKm,
+        totalRouteDistanceKm: totalDist,
         distanceKm: segDistKm,
         avgElevationMeters: avgAltMeters,
         maxGradePercent: shortestSubAnalysis.maxGrade,
@@ -361,6 +366,8 @@ class ElevationRouter {
     return {
       numSegments,
       segmentedLegs,
+      waypointsList,
+      totalRouteDistanceKm: totalDist,
       totalSegSavingsLiters,
       totalSegFuelSavingsINR,
       totalSegTollSavingsINR,

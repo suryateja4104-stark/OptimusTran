@@ -1044,3 +1044,20 @@ select:focus, input:focus {
 .eco-table {
   min-width: 720px;
 }
+
+/* Interactive Segment Row Selection */
+.segment-table tbody tr {
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.segment-table tbody tr:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
+}
+
+.segment-table tbody tr.segment-row-selected {
+  background: rgba(37, 99, 235, 0.14) !important;
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  box-shadow: inset 5px 0 0 #2563eb, 0 4px 12px rgba(37, 99, 235, 0.2);
+}
