@@ -172,6 +172,7 @@ class ElevationRouter {
     const totalClimbSavedMeters = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
 
     const isEcoRouteSuperior = netFuelSavedLiters > 0;
+    const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR);
 
     return {
       shortest: {
@@ -184,6 +185,7 @@ class ElevationRouter {
         analysis: ecoAnalysis,
         totalFuelLiters: Math.round(totalEcoFuel * 10) / 10
       },
+      segmentedBreakdown,
       recommendation: {
         isEcoRouteSuperior,
         netFuelSavedLiters: Math.max(0, netFuelSavedLiters),
@@ -191,9 +193,96 @@ class ElevationRouter {
         totalClimbSavedMeters: Math.max(0, totalClimbSavedMeters),
         co2SavedKg: Math.round(Math.max(0, netFuelSavedLiters) * 2.68),
         summaryText: isEcoRouteSuperior 
-          ? `Taking the Eco-Incline Bypass reduces steep vertical climbs by ${totalClimbSavedMeters}m, saving ${netFuelSavedLiters} Liters of diesel (₹${netMoneySavedINR.toLocaleString()} savings) compared to the shortest mountain highway.`
+          ? `Taking the Eco-Incline Bypass reduces steep vertical climbs by ${totalClimbSavedMeters}m, saving ${netFuelSavedLiters} Liters of diesel (₹${netMoneySavedINR.toLocaleString()} savings) across ${segmentedBreakdown.numSegments} town legs compared to the shortest mountain highway.`
           : `The Shortest Highway is already incline-optimal for this corridor.`
       }
+    };
+  }
+
+  /**
+   * Calculate 10-segment (or N-segment) town-by-town fuel savings,
+   * average elevation, fastest vs. eco transit times, and traffic area status.
+   */
+  calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons = 18, vehicleCategory = '6axle', mileageKml = 3.2, dieselPriceINR = 94.50) {
+    const shortestPts = shortestProfile.points || [];
+    const ecoPts = ecoProfile.points || [];
+    const totalDist = Math.max(shortestProfile.distanceKm || 100, ecoProfile.distanceKm || 100);
+
+    const shortestWaypoints = shortestProfile.intermediateCities || [];
+    const ecoWaypoints = ecoProfile.intermediateCities || [];
+
+    // Target ~6-10 segment breakdown across the corridor
+    const numSegments = Math.min(10, Math.max(5, Math.round(totalDist / 65)));
+    const segmentedLegs = [];
+
+    for (let i = 0; i < numSegments; i++) {
+      const startRatio = i / numSegments;
+      const endRatio = (i + 1) / numSegments;
+
+      const segStartKm = Math.round(totalDist * startRatio);
+      const segEndKm = Math.round(totalDist * endRatio);
+      const segDistKm = Math.max(5, segEndKm - segStartKm);
+
+      const shortestSubPts = shortestPts.filter(p => p.distanceKm >= segStartKm && p.distanceKm <= segEndKm);
+      const ecoSubPts = ecoPts.filter(p => p.distanceKm >= segStartKm && p.distanceKm <= segEndKm);
+
+      const shortestSubAnalysis = this.analyzeProfile(shortestSubPts.length >= 2 ? shortestSubPts : shortestPts.slice(0, 2), payloadTons, vehicleCategory);
+      const ecoSubAnalysis = this.analyzeProfile(ecoSubPts.length >= 2 ? ecoSubPts : ecoPts.slice(0, 2), payloadTons, vehicleCategory);
+
+      const p1Alt = shortestSubPts[0]?.altitudeMeters || 200;
+      const p2Alt = shortestSubPts[shortestSubPts.length - 1]?.altitudeMeters || 200;
+      const avgAltMeters = Math.round((p1Alt + p2Alt) / 2);
+
+      const fastestSpeedKmh = shortestSubAnalysis.maxGrade > 4.0 ? 32 : 52;
+      const ecoSpeedKmh = ecoSubAnalysis.maxGrade > 4.0 ? 42 : 64;
+
+      const fastestTimeHours = Math.round((segDistKm / fastestSpeedKmh) * 10) / 10;
+      const ecoTimeHours = Math.round(((segDistKm * 1.04) / ecoSpeedKmh) * 10) / 10;
+
+      const fastestFuelLiters = Math.round(((segDistKm / mileageKml) + shortestSubAnalysis.extraFuelLiters) * 10) / 10;
+      const ecoFuelLiters = Math.round((((segDistKm * 1.04) / mileageKml) + ecoSubAnalysis.extraFuelLiters) * 10) / 10;
+
+      const segFuelSavingsLiters = Math.round(Math.max(0, fastestFuelLiters - ecoFuelLiters) * 10) / 10;
+      const segMoneySavingsINR = Math.round(segFuelSavingsLiters * dieselPriceINR);
+
+      const isHighTraffic = (shortestSubAnalysis.maxGrade >= 3.5 || i === 0 || i === numSegments - 1 || shortestSubAnalysis.steepClimbsCount > 0);
+      const trafficStatus = isHighTraffic ? 'HIGH' : 'LOW';
+      const trafficReason = isHighTraffic
+        ? (shortestSubAnalysis.maxGrade >= 3.5 ? 'Steep Mountain Ghat Bottleneck' : 'Urban Freight Congestion')
+        : 'Open Bypass / Low-Density Highway';
+
+      const fromName = (i === 0) ? 'Origin' : (shortestWaypoints[i - 1]?.name || `Town ${i}`);
+      const toName = (i === numSegments - 1) ? 'Destination' : (shortestWaypoints[i]?.name || `Town ${i + 1}`);
+
+      segmentedLegs.push({
+        legNumber: i + 1,
+        legName: `${fromName} ➔ ${toName}`,
+        distanceKm: segDistKm,
+        avgElevationMeters: avgAltMeters,
+        maxGradePercent: shortestSubAnalysis.maxGrade,
+        fastestTimeHours,
+        fastestFuelLiters,
+        ecoTimeHours,
+        ecoFuelLiters,
+        segFuelSavingsLiters,
+        segMoneySavingsINR,
+        trafficStatus,
+        trafficReason
+      });
+    }
+
+    const totalSegSavingsLiters = Math.round(segmentedLegs.reduce((acc, leg) => acc + leg.segFuelSavingsLiters, 0) * 10) / 10;
+    const totalSegSavingsINR = Math.round(totalSegSavingsLiters * dieselPriceINR);
+    const highTrafficCount = segmentedLegs.filter(l => l.trafficStatus === 'HIGH').length;
+    const lowTrafficCount = segmentedLegs.filter(l => l.trafficStatus === 'LOW').length;
+
+    return {
+      numSegments,
+      segmentedLegs,
+      totalSegSavingsLiters,
+      totalSegSavingsINR,
+      highTrafficCount,
+      lowTrafficCount
     };
   }
 }

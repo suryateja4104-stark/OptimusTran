@@ -326,6 +326,39 @@
               </tbody>
             </table>
           </div>
+
+          <!-- NEW 10-SEGMENT CITY & TOWN BREAKDOWN SECTION -->
+          <div class="segment-breakdown-container">
+            <div class="segment-header-bar">
+              <div class="segment-title">
+                <h3><i class="fa-solid fa-route"></i> City-to-Town Leg Breakdown & Traffic Flags (~10km Mesh)</h3>
+                <span>Segmented fuel consumption, average elevation, fastest vs. eco times, and traffic density</span>
+              </div>
+              <div class="segment-kpi-pills" id="segmentKpiPills">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <div class="eco-comparison-table-wrapper">
+              <table class="eco-table segment-table">
+                <thead>
+                  <tr>
+                    <th>Leg #</th>
+                    <th>City / Town Segment</th>
+                    <th>Distance</th>
+                    <th>Avg Elevation</th>
+                    <th>Traffic Status</th>
+                    <th>Fastest Route (Time & Fuel)</th>
+                    <th>Fuel Efficient Route (Time & Fuel)</th>
+                    <th>Leg Savings (L & ₹)</th>
+                  </tr>
+                </thead>
+                <tbody id="segmentTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     </main>

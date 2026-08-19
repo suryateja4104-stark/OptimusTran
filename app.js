@@ -631,7 +631,9 @@ class TransportPlannerApp {
     cities.forEach(c => {
       const badge = document.createElement('span');
       badge.className = 'city-badge';
-      badge.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${c.name} (${c.alt}m)`;
+      const isHighTraffic = (c.alt > 350 || c.name.includes('Pass') || c.name.includes('Summit'));
+      const trafficDot = isHighTraffic ? '🔴 High Traffic' : '🟢 Low Traffic';
+      badge.innerHTML = `<i class="fa-solid fa-location-dot"></i> ${c.name} (${c.alt}m) · <small>${trafficDot}</small>`;
       strip.appendChild(badge);
     });
   }
@@ -793,6 +795,44 @@ class TransportPlannerApp {
         <td><strong style="color: #059669;">₹${(eFuelCost + 12000).toLocaleString('en-IN')}</strong></td>
       </tr>
     `;
+
+    this.renderSegmentedTable(ecoComparison);
+  }
+
+  renderSegmentedTable(ecoComparison) {
+    const segData = ecoComparison.segmentedBreakdown;
+    if (!segData || !segData.segmentedLegs) return;
+
+    const kpiContainer = document.getElementById('segmentKpiPills');
+    if (kpiContainer) {
+      kpiContainer.innerHTML = `
+        <span class="segment-pill"><i class="fa-solid fa-layer-group"></i> <strong>${segData.numSegments}</strong> Town Legs</span>
+        <span class="segment-pill traffic-pill-high"><i class="fa-solid fa-triangle-exclamation"></i> <strong>${segData.highTrafficCount}</strong> High Traffic</span>
+        <span class="segment-pill traffic-pill-low"><i class="fa-solid fa-circle-check"></i> <strong>${segData.lowTrafficCount}</strong> Low Traffic</span>
+        <span class="segment-pill segment-pill-savings"><i class="fa-solid fa-piggy-bank"></i> Total Savings: <strong>${segData.totalSegSavingsLiters} L</strong> (₹${segData.totalSegSavingsINR.toLocaleString('en-IN')})</span>
+      `;
+    }
+
+    const tbody = document.getElementById('segmentTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = segData.segmentedLegs.map(leg => {
+      const trafficBadgeClass = leg.trafficStatus === 'HIGH' ? 'traffic-badge-high' : 'traffic-badge-low';
+      const trafficIcon = leg.trafficStatus === 'HIGH' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+
+      return `
+        <tr>
+          <td><strong>#${leg.legNumber}</strong></td>
+          <td><strong>${leg.legName}</strong></td>
+          <td>${leg.distanceKm} km</td>
+          <td><strong>${leg.avgElevationMeters} m</strong></td>
+          <td><span class="traffic-badge ${trafficBadgeClass}"><i class="fa-solid ${trafficIcon}"></i> ${leg.trafficStatus} (${leg.trafficReason})</span></td>
+          <td><i class="fa-solid fa-clock"></i> ${leg.fastestTimeHours}h | <i class="fa-solid fa-gas-pump"></i> ${leg.fastestFuelLiters} L</td>
+          <td><strong style="color: #059669;"><i class="fa-solid fa-clock"></i> ${leg.ecoTimeHours}h | <i class="fa-solid fa-gas-pump"></i> ${leg.ecoFuelLiters} L</strong></td>
+          <td><strong style="color: #059669;">+${leg.segFuelSavingsLiters} L (₹${leg.segMoneySavingsINR.toLocaleString('en-IN')})</strong></td>
+        </tr>
+      `;
+    }).join('');
   }
 }
 
