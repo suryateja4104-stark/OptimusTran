@@ -66,19 +66,59 @@ class TransportPlannerApp {
   }
 
   initLeafletMap() {
-    this.map = L.map('leafletMap', {
-      zoomControl: true,
-      attributionControl: true
-    }).setView([15.0, 79.0], 6);
+    const mapEl = document.getElementById('leafletMap');
+    if (!mapEl) return;
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(this.map);
+    if (this.map) {
+      try {
+        this.map.remove();
+      } catch (err) {
+        // ignore
+      }
+      this.map = null;
+    }
 
-    setTimeout(() => {
-      if (this.map) this.map.invalidateSize();
-    }, 200);
+    try {
+      this.map = L.map('leafletMap', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([15.0, 79.0], 6);
+
+      const primaryTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      });
+
+      const fallbackTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      });
+
+      primaryTiles.on('tileerror', () => {
+        if (this.map) {
+          try {
+            this.map.removeLayer(primaryTiles);
+            fallbackTiles.addTo(this.map);
+          } catch (e) {}
+        }
+      });
+
+      primaryTiles.addTo(this.map);
+
+      if (window.ResizeObserver && mapEl) {
+        const ro = new ResizeObserver(() => {
+          if (this.map) this.map.invalidateSize();
+        });
+        ro.observe(mapEl);
+      }
+
+      setTimeout(() => {
+        if (this.map) this.map.invalidateSize();
+      }, 250);
+    } catch (err) {
+      console.warn("Leaflet init error:", err);
+    }
   }
 
   /**
