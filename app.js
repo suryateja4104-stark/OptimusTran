@@ -27,13 +27,19 @@ class TransportPlannerApp {
   }
 
   init() {
-    document.addEventListener('DOMContentLoaded', () => {
+    const start = () => {
       this.populateCityDropdowns();
       this.initLeafletMap();
       this.initElevationChart();
       this.bindEvents();
       this.loadCorridor(this.currentCorridor.id);
-    });
+    };
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      start();
+    } else {
+      document.addEventListener('DOMContentLoaded', start);
+    }
   }
 
   populateCityDropdowns() {
@@ -430,23 +436,34 @@ class TransportPlannerApp {
   }
 
   handleCustomCitySelection() {
-    const origId = document.getElementById('originCitySelect').value;
-    const destId = document.getElementById('destCitySelect').value;
+    let origId = document.getElementById('originCitySelect').value;
+    let destId = document.getElementById('destCitySelect').value;
 
-    this.originCity = this.cities.find(c => c.id === origId);
-    this.destCity = this.cities.find(c => c.id === destId);
+    if (!origId || !destId) return;
+
+    if (origId === destId) {
+      const otherCity = this.cities.find(c => c.id !== origId);
+      if (otherCity) {
+        destId = otherCity.id;
+        document.getElementById('destCitySelect').value = destId;
+      }
+    }
+
+    this.originCity = this.cities.find(c => c.id === origId) || this.cities[0];
+    this.destCity = this.cities.find(c => c.id === destId) || this.cities[1];
 
     const preset = this.corridors.find(c => c.originId === origId && c.destId === destId);
+    const corridorPresetSelect = document.getElementById('corridorPreset');
     if (preset) {
       this.currentCorridor = preset;
-      document.getElementById('corridorPreset').value = preset.id;
+      if (corridorPresetSelect) corridorPresetSelect.value = preset.id;
     } else {
-      document.getElementById('corridorPreset').value = 'custom';
+      if (corridorPresetSelect) corridorPresetSelect.value = 'custom';
       
-      const dist = window.calculateHaversineDistance(
+      const dist = Math.max(10, window.calculateHaversineDistance(
         this.originCity.lat, this.originCity.lng,
         this.destCity.lat, this.destCity.lng
-      );
+      ));
 
       this.currentCorridor = {
         id: 'custom',
