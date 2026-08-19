@@ -556,6 +556,7 @@ class TransportPlannerApp {
   }
 
   updateMapRoutes() {
+    if (!this.map) return;
     const origin = this.originCity;
     const destination = this.destCity;
     const elevationData = this.currentCorridor.elevationData;
