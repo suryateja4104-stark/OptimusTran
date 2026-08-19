@@ -137,7 +137,11 @@ class TransportPlannerApp {
 
             ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
             ctx.beginPath();
-            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+            if (ctx.roundRect) {
+              ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+            } else {
+              ctx.rect(boxX, boxY, boxWidth, boxHeight);
+            }
             ctx.fill();
             ctx.strokeStyle = (roadPref === 'eco') ? 'rgba(5, 150, 105, 0.6)' : 'rgba(225, 29, 72, 0.6)';
             ctx.lineWidth = 1;
@@ -248,19 +252,23 @@ class TransportPlannerApp {
 
     // Preset dropdown
     const presetSelect = document.getElementById('corridorPreset');
-    presetSelect.addEventListener('change', (e) => {
-      const selectedId = e.target.value;
-      if (selectedId !== 'custom') {
-        this.loadCorridor(selectedId);
-      }
-    });
+    if (presetSelect) {
+      presetSelect.addEventListener('change', (e) => {
+        const selectedId = e.target.value;
+        if (selectedId !== 'custom') {
+          this.loadCorridor(selectedId);
+        }
+      });
+    }
 
     // Highway Strategy selector & Mesh Segments Inputs
     const roadPref = document.getElementById('roadRoutePreference');
-    roadPref.addEventListener('change', () => {
-      this.updateMapRoutes();
-      this.recalculateAll();
-    });
+    if (roadPref) {
+      roadPref.addEventListener('change', () => {
+        this.updateMapRoutes();
+        this.recalculateAll();
+      });
+    }
 
     const segInputSidebar = document.getElementById('numSegmentsInput');
     const segInputTable = document.getElementById('numSegmentsTableInput');
@@ -294,29 +302,39 @@ class TransportPlannerApp {
 
     // Vehicle Select
     const vehicleSelect = document.getElementById('vehicleSelect');
-    vehicleSelect.addEventListener('change', (e) => {
-      const vehicleKey = e.target.value;
-      const vehicleObj = this.transportEngine.vehicles[vehicleKey];
-      if (vehicleObj) {
-        document.getElementById('vehicleMileage').value = vehicleObj.defaultMileageKml;
-      }
-    });
+    if (vehicleSelect) {
+      vehicleSelect.addEventListener('change', (e) => {
+        const vehicleKey = e.target.value;
+        const vehicleObj = this.transportEngine.vehicles[vehicleKey];
+        if (vehicleObj) {
+          const milInput = document.getElementById('vehicleMileage');
+          if (milInput) milInput.value = vehicleObj.defaultMileageKml;
+        }
+      });
+    }
 
     // Dimension inputs
     ['dimLength', 'dimWidth', 'dimHeight'].forEach(id => {
-      document.getElementById(id).addEventListener('input', () => this.updateVolumeBadge());
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => this.updateVolumeBadge());
     });
 
     // Calculate Button
-    document.getElementById('btnCalculate').addEventListener('click', () => this.recalculateAll());
+    const btnCalculate = document.getElementById('btnCalculate');
+    if (btnCalculate) {
+      btnCalculate.addEventListener('click', () => this.recalculateAll());
+    }
 
     // Swap Locations Button
-    document.getElementById('btnSwapLocations').addEventListener('click', () => {
-      const tempVal = origSelect.value;
-      origSelect.value = destSelect.value;
-      destSelect.value = tempVal;
-      this.handleCustomCitySelection();
-    });
+    const btnSwap = document.getElementById('btnSwapLocations');
+    if (btnSwap && origSelect && destSelect) {
+      btnSwap.addEventListener('click', () => {
+        const tempVal = origSelect.value;
+        origSelect.value = destSelect.value;
+        destSelect.value = tempVal;
+        this.handleCustomCitySelection();
+      });
+    }
 
     // Assumptions Modal Events
     const btnAssumptions = document.getElementById('btnAssumptionsModal');
@@ -325,57 +343,64 @@ class TransportPlannerApp {
     const btnSaveAssumptions = document.getElementById('btnSaveAssumptions');
     const btnResetAssumptions = document.getElementById('btnResetAssumptions');
 
-    btnAssumptions.addEventListener('click', () => assumptionsModal.classList.add('active'));
-    btnCloseAssumptions.addEventListener('click', () => assumptionsModal.classList.remove('active'));
+    if (btnAssumptions && assumptionsModal) {
+      btnAssumptions.addEventListener('click', () => assumptionsModal.classList.add('active'));
+    }
+    if (btnCloseAssumptions && assumptionsModal) {
+      btnCloseAssumptions.addEventListener('click', () => assumptionsModal.classList.remove('active'));
+    }
     
-    btnSaveAssumptions.addEventListener('click', () => {
-      // Collect custom assumptions
-      const engineEffPercent = parseFloat(document.getElementById('assumpEngineEff').value) || 38;
-      const tareMassTons = parseFloat(document.getElementById('assumpTareWeight').value) || 12;
-      const energyMJ = parseFloat(document.getElementById('assumpFuelEnergy').value) || 38.6;
+    if (btnSaveAssumptions && assumptionsModal) {
+      btnSaveAssumptions.addEventListener('click', () => {
+        const engineEffPercent = parseFloat(document.getElementById('assumpEngineEff')?.value) || 38;
+        const tareMassTons = parseFloat(document.getElementById('assumpTareWeight')?.value) || 12;
+        const energyMJ = parseFloat(document.getElementById('assumpFuelEnergy')?.value) || 38.6;
 
-      this.elevationRouter.updatePhysicsParameters({
-        truckEfficiency: engineEffPercent / 100,
-        tareWeightTons: tareMassTons,
-        fuelEnergyPerLiter: energyMJ
+        this.elevationRouter.updatePhysicsParameters({
+          truckEfficiency: engineEffPercent / 100,
+          tareWeightTons: tareMassTons,
+          fuelEnergyPerLiter: energyMJ
+        });
+
+        this.transportEngine.updateAssumptions({
+          railSidingFee: document.getElementById('assumpRailSidingFee')?.value,
+          railLinehaulRate: document.getElementById('assumpRailLinehaul')?.value,
+          airHandlingFee: document.getElementById('assumpAirHandlingFee')?.value,
+          airLinehaulRate: document.getElementById('assumpAirLinehaul')?.value
+        });
+
+        assumptionsModal.classList.remove('active');
+        this.recalculateAll();
       });
+    }
 
-      this.transportEngine.updateAssumptions({
-        railSidingFee: document.getElementById('assumpRailSidingFee').value,
-        railLinehaulRate: document.getElementById('assumpRailLinehaul').value,
-        airHandlingFee: document.getElementById('assumpAirHandlingFee').value,
-        airLinehaulRate: document.getElementById('assumpAirLinehaul').value
+    if (btnResetAssumptions && assumptionsModal) {
+      btnResetAssumptions.addEventListener('click', () => {
+        if (document.getElementById('assumpEngineEff')) document.getElementById('assumpEngineEff').value = 38;
+        if (document.getElementById('assumpTareWeight')) document.getElementById('assumpTareWeight').value = 12;
+        if (document.getElementById('assumpFuelEnergy')) document.getElementById('assumpFuelEnergy').value = 38.6;
+        if (document.getElementById('assumpRailSidingFee')) document.getElementById('assumpRailSidingFee').value = 4500;
+        if (document.getElementById('assumpRailLinehaul')) document.getElementById('assumpRailLinehaul').value = 1.45;
+        if (document.getElementById('assumpAirHandlingFee')) document.getElementById('assumpAirHandlingFee').value = 3500;
+        if (document.getElementById('assumpAirLinehaul')) document.getElementById('assumpAirLinehaul').value = 0.048;
+
+        this.elevationRouter.updatePhysicsParameters({
+          truckEfficiency: 0.38,
+          tareWeightTons: 12,
+          fuelEnergyPerLiter: 38.6
+        });
+
+        this.transportEngine.updateAssumptions({
+          railSidingFee: 4500,
+          railLinehaulRate: 1.45,
+          airHandlingFee: 3500,
+          airLinehaulRate: 0.048
+        });
+
+        assumptionsModal.classList.remove('active');
+        this.recalculateAll();
       });
-
-      assumptionsModal.classList.remove('active');
-      this.recalculateAll();
-    });
-
-    btnResetAssumptions.addEventListener('click', () => {
-      document.getElementById('assumpEngineEff').value = 38;
-      document.getElementById('assumpTareWeight').value = 12;
-      document.getElementById('assumpFuelEnergy').value = 38.6;
-      document.getElementById('assumpRailSidingFee').value = 4500;
-      document.getElementById('assumpRailLinehaul').value = 1.45;
-      document.getElementById('assumpAirHandlingFee').value = 3500;
-      document.getElementById('assumpAirLinehaul').value = 0.048;
-
-      this.elevationRouter.updatePhysicsParameters({
-        truckEfficiency: 0.38,
-        tareWeightTons: 12,
-        fuelEnergyPerLiter: 38.6
-      });
-
-      this.transportEngine.updateAssumptions({
-        railSidingFee: 4500,
-        railLinehaulRate: 1.45,
-        airHandlingFee: 3500,
-        airLinehaulRate: 0.048
-      });
-
-      assumptionsModal.classList.remove('active');
-      this.recalculateAll();
-    });
+    }
 
     // Show Logic Modal Events
     const btnLogic = document.getElementById('btnShowLogic');
@@ -383,9 +408,15 @@ class TransportPlannerApp {
     const btnCloseLogic = document.getElementById('btnCloseLogic');
     const btnCloseLogicFooter = document.getElementById('btnCloseLogicFooter');
 
-    btnLogic.addEventListener('click', () => logicModal.classList.add('active'));
-    btnCloseLogic.addEventListener('click', () => logicModal.classList.remove('active'));
-    btnCloseLogicFooter.addEventListener('click', () => logicModal.classList.remove('active'));
+    if (btnLogic && logicModal) {
+      btnLogic.addEventListener('click', () => logicModal.classList.add('active'));
+    }
+    if (btnCloseLogic && logicModal) {
+      btnCloseLogic.addEventListener('click', () => logicModal.classList.remove('active'));
+    }
+    if (btnCloseLogicFooter && logicModal) {
+      btnCloseLogicFooter.addEventListener('click', () => logicModal.classList.remove('active'));
+    }
 
     // Settings Modal
     const btnSettings = document.getElementById('btnSettingsModal');
@@ -396,15 +427,25 @@ class TransportPlannerApp {
     const mapProviderSelect = document.getElementById('mapProviderSelect');
     const gmapsKeyGroup = document.getElementById('gmapsKeyGroup');
 
-    btnSettings.addEventListener('click', () => settingsModal.classList.add('active'));
-    btnCloseSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
-    btnCancelSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
+    if (btnSettings && settingsModal) {
+      btnSettings.addEventListener('click', () => settingsModal.classList.add('active'));
+    }
+    if (btnCloseSettings && settingsModal) {
+      btnCloseSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
+    }
+    if (btnCancelSettings && settingsModal) {
+      btnCancelSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
+    }
 
-    mapProviderSelect.addEventListener('change', (e) => {
-      gmapsKeyGroup.style.display = (e.target.value === 'gmaps') ? 'block' : 'none';
-    });
+    if (mapProviderSelect && gmapsKeyGroup) {
+      mapProviderSelect.addEventListener('change', (e) => {
+        gmapsKeyGroup.style.display = (e.target.value === 'gmaps') ? 'block' : 'none';
+      });
+    }
 
-    btnSaveSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
+    if (btnSaveSettings && settingsModal) {
+      btnSaveSettings.addEventListener('click', () => settingsModal.classList.remove('active'));
+    }
   }
 
   loadCorridor(corridorId) {
