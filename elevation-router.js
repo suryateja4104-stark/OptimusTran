@@ -157,7 +157,7 @@ class ElevationRouter {
   /**
    * Compare Shortest Route vs. Eco-Incline Route
    */
-  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50, vehicleCategory = '6axle', customSegments = 10) {
+  compareRoutes(shortestProfile, ecoProfile, payloadTons = 18, mileageKml = 3.2, dieselPriceINR = 94.50, vehicleCategory = '6axle', customSegments = 10, originCityName = '', destCityName = '') {
     const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons, vehicleCategory);
     const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons, vehicleCategory);
 
@@ -172,7 +172,7 @@ class ElevationRouter {
     const totalClimbSavedMeters = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
 
     const isEcoRouteSuperior = netFuelSavedLiters > 0;
-    const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR, customSegments);
+    const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR, customSegments, originCityName, destCityName);
 
     return {
       shortest: {
@@ -203,7 +203,7 @@ class ElevationRouter {
    * Calculate N-segment town-by-town fuel savings,
    * average elevation, fastest vs. eco transit times, and traffic area status.
    */
-  calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons = 18, vehicleCategory = '6axle', mileageKml = 3.2, dieselPriceINR = 94.50, customSegments = 10) {
+  calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons = 18, vehicleCategory = '6axle', mileageKml = 3.2, dieselPriceINR = 94.50, customSegments = 10, originCityName = '', destCityName = '') {
     const shortestPts = shortestProfile.points || [];
     const ecoPts = ecoProfile.points || [];
     const totalDist = Math.max(shortestProfile.distanceKm || 100, ecoProfile.distanceKm || 100);
@@ -213,6 +213,23 @@ class ElevationRouter {
 
     const numSegments = Math.min(30, Math.max(2, parseInt(customSegments) || 10));
     const segmentedLegs = [];
+
+    const cleanOrigin = (originCityName || 'Origin').split(',')[0].trim();
+    const cleanDest = (destCityName || 'Destination').split(',')[0].trim();
+
+    const waypointsList = [cleanOrigin];
+    if (shortestWaypoints && shortestWaypoints.length > 0) {
+      shortestWaypoints.forEach(w => {
+        const name = (typeof w === 'string') ? w : (w.name || w.city);
+        if (name) waypointsList.push(name.split('(')[0].split(',')[0].trim());
+      });
+    }
+
+    while (waypointsList.length < numSegments + 1) {
+      const idx = waypointsList.length;
+      waypointsList.splice(waypointsList.length - 1, 0, `Midway Hub #${idx}`);
+    }
+    waypointsList[waypointsList.length - 1] = cleanDest;
 
     for (let i = 0; i < numSegments; i++) {
       const startRatio = i / numSegments;
@@ -250,8 +267,19 @@ class ElevationRouter {
         ? (shortestSubAnalysis.maxGrade >= 3.5 ? 'Steep Mountain Ghat Bottleneck' : 'Urban Freight Congestion')
         : 'Open Bypass / Low-Density Highway';
 
-      const fromName = (i === 0) ? 'Origin' : (shortestWaypoints[i - 1]?.name || `Town ${i}`);
-      const toName = (i === numSegments - 1) ? 'Destination' : (shortestWaypoints[i]?.name || `Town ${i + 1}`);
+      const stepFromIndex = Math.floor((i / numSegments) * (waypointsList.length - 1));
+      let stepToIndex = Math.ceil(((i + 1) / numSegments) * (waypointsList.length - 1));
+      if (stepToIndex <= stepFromIndex) stepToIndex = stepFromIndex + 1;
+      if (stepToIndex >= waypointsList.length) stepToIndex = waypointsList.length - 1;
+
+      let fromName = waypointsList[stepFromIndex] || (i === 0 ? cleanOrigin : `Town ${i}`);
+      let toName = waypointsList[stepToIndex] || (i === numSegments - 1 ? cleanDest : `Town ${i + 1}`);
+
+      if (fromName === toName) {
+        if (i === 0) fromName = cleanOrigin;
+        if (i === numSegments - 1) toName = cleanDest;
+        else toName = `${fromName} Sector ${i + 1}`;
+      }
 
       segmentedLegs.push({
         legNumber: i + 1,

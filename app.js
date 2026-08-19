@@ -762,7 +762,9 @@ class TransportPlannerApp {
       customMileage,
       dieselRateINR,
       '6axle',
-      customSegments
+      customSegments,
+      this.originCity ? this.originCity.name : 'Origin',
+      this.destCity ? this.destCity.name : 'Destination'
     );
 
     const selectedRoadProfile = (roadPref === 'eco') ? ecoComparison.eco : ecoComparison.shortest;
