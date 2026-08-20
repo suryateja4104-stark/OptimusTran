@@ -295,6 +295,134 @@ const PRESET_CORRIDORS = [
         ])
       }
     }
+  },
+  {
+    id: 'hyd-del',
+    name: 'Hyderabad ➔ Delhi / NCR',
+    originId: 'hyd',
+    destId: 'del',
+    origin: { name: 'Hyderabad, Telangana', lat: 17.3850, lng: 78.4867 },
+    destination: { name: 'Delhi / NCR', lat: 28.6139, lng: 77.2090 },
+    distanceKm: 1543,
+    elevationData: {
+      shortestRoute: {
+        name: 'NH44 North-South Direct Highway',
+        distanceKm: 1580,
+        totalClimbMeters: 2240,
+        maxGrade: 6.2,
+        avgGrade: 1.9,
+        waypoints: [
+          [17.3850, 78.4867], // Hyderabad
+          [19.0680, 78.3480], // Nirmal
+          [21.1458, 79.0882], // Nagpur
+          [22.0860, 79.5420], // Seoni Pass
+          [25.4484, 78.5685], // Jhansi
+          [26.2183, 78.1772], // Gwalior
+          [27.1767, 78.0081], // Agra
+          [28.6139, 77.2090]  // Delhi
+        ],
+        intermediateCities: [
+          { name: 'Nirmal', alt: 340, lat: 19.0680, lng: 78.3480 },
+          { name: 'Nagpur', alt: 310, lat: 21.1458, lng: 79.0882 },
+          { name: 'Seoni Pass', alt: 615, lat: 22.0860, lng: 79.5420 },
+          { name: 'Jhansi', alt: 285, lat: 25.4484, lng: 78.5685 },
+          { name: 'Agra', alt: 171, lat: 27.1767, lng: 78.0081 }
+        ],
+        points: generateElevationProfile(1580, 466, 216, [
+          { pos: 0.15, alt: 340, city: 'Nirmal (340m)' },
+          { pos: 0.35, alt: 310, city: 'Nagpur (310m)' },
+          { pos: 0.52, alt: 615, city: 'Seoni Pass (615m)' },
+          { pos: 0.72, alt: 285, city: 'Jhansi (285m)' },
+          { pos: 0.88, alt: 171, city: 'Agra (171m)' }
+        ])
+      },
+      ecoRoute: {
+        name: 'NH161 & NE4 Expressway (Google Maps Preferred 1,543 km)',
+        distanceKm: 1543,
+        totalClimbMeters: 980,
+        maxGrade: 2.8,
+        avgGrade: 0.9,
+        waypoints: [
+          [17.3850, 78.4867], // Hyderabad
+          [19.1383, 77.3210], // Nanded
+          [22.7196, 75.8577], // Indore
+          [25.2138, 75.8648], // Kota Expressway
+          [26.9120, 75.7870], // Jaipur
+          [28.6139, 77.2090]  // Delhi
+        ],
+        intermediateCities: [
+          { name: 'Nanded', alt: 362, lat: 19.1383, lng: 77.3210 },
+          { name: 'Indore', alt: 553, lat: 22.7196, lng: 75.8577 },
+          { name: 'Kota Bypass', alt: 271, lat: 25.2138, lng: 75.8648 },
+          { name: 'Jaipur Expressway', alt: 431, lat: 26.9120, lng: 75.7870 }
+        ],
+        points: generateElevationProfile(1543, 466, 216, [
+          { pos: 0.2, alt: 362, city: 'Nanded (362m)' },
+          { pos: 0.45, alt: 553, city: 'Indore (553m)' },
+          { pos: 0.72, alt: 271, city: 'Kota Bypass (271m)' },
+          { pos: 0.88, alt: 431, city: 'Jaipur Expressway (431m)' }
+        ])
+      }
+    }
+  },
+  {
+    id: 'del-hyd',
+    name: 'Delhi / NCR ➔ Hyderabad',
+    originId: 'del',
+    destId: 'hyd',
+    origin: { name: 'Delhi / NCR', lat: 28.6139, lng: 77.2090 },
+    destination: { name: 'Hyderabad, Telangana', lat: 17.3850, lng: 78.4867 },
+    distanceKm: 1543,
+    elevationData: {
+      shortestRoute: {
+        name: 'NH44 Southbound Expressway',
+        distanceKm: 1580,
+        totalClimbMeters: 2240,
+        maxGrade: 6.2,
+        avgGrade: 1.9,
+        waypoints: [
+          [28.6139, 77.2090], // Delhi
+          [27.1767, 78.0081], // Agra
+          [25.4484, 78.5685], // Jhansi
+          [21.1458, 79.0882], // Nagpur
+          [17.3850, 78.4867]  // Hyderabad
+        ],
+        intermediateCities: [
+          { name: 'Agra', alt: 171, lat: 27.1767, lng: 78.0081 },
+          { name: 'Jhansi', alt: 285, lat: 25.4484, lng: 78.5685 },
+          { name: 'Nagpur', alt: 310, lat: 21.1458, lng: 79.0882 }
+        ],
+        points: generateElevationProfile(1580, 216, 466, [
+          { pos: 0.15, alt: 171, city: 'Agra (171m)' },
+          { pos: 0.45, alt: 285, city: 'Jhansi (285m)' },
+          { pos: 0.75, alt: 310, city: 'Nagpur (310m)' }
+        ])
+      },
+      ecoRoute: {
+        name: 'NE4 & NH161 Expressway (Google Maps Preferred 1,543 km)',
+        distanceKm: 1543,
+        totalClimbMeters: 980,
+        maxGrade: 2.8,
+        avgGrade: 0.9,
+        waypoints: [
+          [28.6139, 77.2090], // Delhi
+          [26.9120, 75.7870], // Jaipur
+          [25.2138, 75.8648], // Kota
+          [22.7196, 75.8577], // Indore
+          [17.3850, 78.4867]  // Hyderabad
+        ],
+        intermediateCities: [
+          { name: 'Jaipur Expressway', alt: 431, lat: 26.9120, lng: 75.7870 },
+          { name: 'Kota Bypass', alt: 271, lat: 25.2138, lng: 75.8648 },
+          { name: 'Indore', alt: 553, lat: 22.7196, lng: 75.8577 }
+        ],
+        points: generateElevationProfile(1543, 216, 466, [
+          { pos: 0.2, alt: 431, city: 'Jaipur Expressway (431m)' },
+          { pos: 0.5, alt: 271, city: 'Kota Bypass (271m)' },
+          { pos: 0.75, alt: 553, city: 'Indore (553m)' }
+        ])
+      }
+    }
   }
 ];
 
