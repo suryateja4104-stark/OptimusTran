@@ -1346,7 +1346,10 @@ class TransportPlannerApp {
     const e = ecoComparison.eco;
     const rec = ecoComparison.recommendation;
 
-    document.getElementById('ecoBannerText').innerHTML = rec.summaryText;
+    const bannerEl = document.getElementById('ecoBannerText');
+    if (bannerEl) bannerEl.innerHTML = rec.summaryText;
+
+    const baseKml = parseFloat(document.getElementById('vehicleMileage').value) || 3.2;
 
     const sFuelCost = Math.round(s.totalFuelLiters * dieselRateINR);
     const eFuelCost = Math.round(e.totalFuelLiters * dieselRateINR);
@@ -1354,10 +1357,22 @@ class TransportPlannerApp {
     const eToll = e.tollINR || 0;
     const sTotalCost = sFuelCost + sToll + 12000;
     const eTotalCost = eFuelCost + eToll + 12000;
-    const totalSaving = Math.max(0, sTotalCost - eTotalCost);
 
-    const sKml = s.analysis.cmvrGhatMileageKml || s.analysis.cmvrPlainsMileageKml || 3.2;
-    const eKml = (parseFloat(document.getElementById('vehicleMileage').value) || 3.2) * 1.18;
+    const netFuelSavedLiters = rec.netFuelSavedLiters;
+    const netFuelMoneySavedINR = Math.round(netFuelSavedLiters * dieselRateINR);
+    const netTollSavedINR = rec.tollSavedINR;
+    const netTotalSavedINR = rec.netMoneySavedINR;
+
+    const sHasPenalty = s.analysis.maxGrade > 2.0;
+    const sKml = sHasPenalty ? s.analysis.cmvrGhatMileageKml : baseKml;
+    const sKmlText = sHasPenalty 
+      ? `${sKml} km/L (+${s.analysis.cmvrExtraFuelPenaltyPercent}% Ghat Penalty)` 
+      : `${baseKml.toFixed(1)} km/L (Standard Plains)`;
+
+    const eKml = rec.isEcoRouteSuperior ? (baseKml * 1.12) : baseKml;
+    const eKmlText = rec.isEcoRouteSuperior 
+      ? `${eKml.toFixed(2)} km/L (Gradient Optimized)` 
+      : `${baseKml.toFixed(1)} km/L (Standard Plains)`;
 
     const thead = document.querySelector('#ecoTableBody')?.closest('table')?.querySelector('thead tr');
     if (thead && thead.children.length < 9) {
@@ -1377,22 +1392,22 @@ class TransportPlannerApp {
     const tbody = document.getElementById('ecoTableBody');
     tbody.innerHTML = `
       <tr style="background: rgba(225, 29, 72, 0.05);">
-        <td><strong>Shortest Highway (Ghat Mountain Cut)</strong></td>
+        <td><strong>Shortest Highway (Direct Road)</strong></td>
         <td>${s.distanceKm} km</td>
-        <td><strong style="color: #e11d48;">${s.analysis.totalClimbMeters} m</strong></td>
+        <td><strong style="color: ${s.analysis.maxGrade > 2.0 ? '#e11d48' : 'var(--text-primary)'};">${s.analysis.totalClimbMeters} m</strong></td>
         <td>${s.analysis.maxGrade}%</td>
-        <td><span title="Ghat Slope Consumption Penalty: +${s.analysis.cmvrExtraFuelPenaltyPercent}% fuel">${sKml} km/L (+${s.analysis.cmvrExtraFuelPenaltyPercent}% Ghat Penalty)</span></td>
+        <td><span>${sKmlText}</span></td>
         <td>${s.totalFuelLiters} L</td>
         <td>₹${sFuelCost.toLocaleString('en-IN')}</td>
         <td>₹${sToll.toLocaleString('en-IN')}</td>
         <td>₹${sTotalCost.toLocaleString('en-IN')}</td>
       </tr>
       <tr style="background: rgba(5, 150, 105, 0.08);">
-        <td><strong style="color: #059669;">Eco-Incline Bypass (Gentle Contour) ⭐</strong></td>
+        <td><strong style="color: #059669;">Eco-Incline Bypass (Gentle Contour) ${rec.isEcoRouteSuperior ? '⭐' : ''}</strong></td>
         <td>${e.distanceKm} km</td>
         <td><strong style="color: #059669;">${e.analysis.totalClimbMeters} m</strong></td>
         <td>${e.analysis.maxGrade}%</td>
-        <td><strong style="color: #059669;">${eKml.toFixed(2)} km/L (Optimized)</strong></td>
+        <td><strong style="color: #059669;">${eKmlText}</strong></td>
         <td><strong style="color: #059669;">${e.totalFuelLiters} L</strong></td>
         <td><strong style="color: #059669;">₹${eFuelCost.toLocaleString('en-IN')}</strong></td>
         <td><strong style="color: #059669;">₹${eToll.toLocaleString('en-IN')}</strong></td>
@@ -1400,9 +1415,9 @@ class TransportPlannerApp {
       </tr>
       <tr style="background: rgba(37,99,235,0.06); border-top: 2px solid rgba(37,99,235,0.25);">
         <td colspan="6"><strong style="color:#2563eb;">&#127381; Net Savings (Eco vs Shortest)</strong></td>
-        <td><strong style="color:#16a34a;">₹${Math.max(0,sFuelCost-eFuelCost).toLocaleString('en-IN')}</strong></td>
-        <td><strong style="color:#16a34a;">₹${Math.max(0,sToll-eToll).toLocaleString('en-IN')}</strong></td>
-        <td><strong style="color:#16a34a; font-size:1rem;">₹${totalSaving.toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color:${netFuelMoneySavedINR > 0 ? '#16a34a' : '#94a3b8'};">₹${netFuelMoneySavedINR.toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color:${netTollSavedINR > 0 ? '#16a34a' : '#94a3b8'};">₹${netTollSavedINR.toLocaleString('en-IN')}</strong></td>
+        <td><strong style="color:${netTotalSavedINR > 0 ? '#16a34a' : '#94a3b8'}; font-size:1rem;">₹${netTotalSavedINR.toLocaleString('en-IN')}</strong></td>
       </tr>
     `;
 

@@ -134,10 +134,17 @@ class ElevationRouter {
     
     const fuelLitersForClimb = potentialEnergyMJ / (this.fuelEnergyPerLiter * this.truckEfficiency);
 
-    // CMVR Post-2018 Empirical Fuel & Penalty Calculations
+    // CMVR Post-2018 Empirical Fuel & Penalty Calculations based on ACTUAL maxGrade!
     const plainCMVR = this.calculateCMVRFuelConsumption(grossWeightTons, Math.min(1.5, avgGrade), 50, vehicleCategory);
-    const ghatCMVR = this.calculateCMVRFuelConsumption(grossWeightTons, Math.max(2.5, maxGrade), 30, vehicleCategory);
-    const cmvrPenaltyPercent = Math.round(((ghatCMVR.c_ml_per_km - plainCMVR.c_ml_per_km) / plainCMVR.c_ml_per_km) * 100);
+    
+    // Only apply ghat consumption formula if maxGrade > 2.0%; otherwise use plain CMVR consumption!
+    const ghatCMVR = (maxGrade > 2.0) 
+      ? this.calculateCMVRFuelConsumption(grossWeightTons, maxGrade, 30, vehicleCategory)
+      : plainCMVR;
+
+    const cmvrPenaltyPercent = (maxGrade > 2.0)
+      ? Math.round(((ghatCMVR.c_ml_per_km - plainCMVR.c_ml_per_km) / plainCMVR.c_ml_per_km) * 100)
+      : 0;
 
     return {
       totalClimbMeters: Math.round(totalClimb),
@@ -149,7 +156,7 @@ class ElevationRouter {
       cmvrPlainsMileageKml: plainCMVR.mileageKml,
       cmvrGhatConsumptionMlKm: ghatCMVR.c_ml_per_km,
       cmvrGhatMileageKml: ghatCMVR.mileageKml,
-      cmvrExtraFuelPenaltyPercent: Math.max(0, cmvrPenaltyPercent),
+      cmvrExtraFuelPenaltyPercent: cmvrPenaltyPercent,
       segments
     };
   }
@@ -161,30 +168,39 @@ class ElevationRouter {
     const shortestAnalysis = this.analyzeProfile(shortestProfile.points, payloadTons, vehicleCategory);
     const ecoAnalysis = this.analyzeProfile(ecoProfile.points, payloadTons, vehicleCategory);
 
-    // Eco bypass gets +18% mileage advantage (bypass momentum, no urban signals, gentle grade)
-    const ecoLegMileage = mileageKml * 1.18;
+    // Check if shortest route has actual mountain incline climb (> 350m climb or maxGrade > 2.5%)
+    const hasMountainIncline = (shortestAnalysis.maxGrade > 2.5 || shortestAnalysis.totalClimbMeters > 350);
+    const climbSaved = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
+    const isEcoSuperiorInClimb = hasMountainIncline && (climbSaved > 150);
 
-    const shortestDistFuel = shortestProfile.distanceKm / mileageKml;
-    const ecoDistFuel = ecoProfile.distanceKm / ecoLegMileage;
+    // Mileage for route:
+    const sEffectiveKml = (shortestAnalysis.maxGrade > 2.5) 
+      ? shortestAnalysis.cmvrGhatMileageKml 
+      : mileageKml;
+
+    const eEffectiveKml = isEcoSuperiorInClimb 
+      ? mileageKml * 1.12 
+      : mileageKml;
+
+    const shortestDistFuel = shortestProfile.distanceKm / sEffectiveKml;
+    const ecoDistFuel = ecoProfile.distanceKm / eEffectiveKml;
 
     const totalShortestFuel = shortestDistFuel + shortestAnalysis.extraFuelLiters;
     const totalEcoFuel = ecoDistFuel + ecoAnalysis.extraFuelLiters;
 
-    // Highway toll costs: NH shortest route has more toll plazas on ghat/express NH
-    // Average NH toll: ₹2.40/km (shortest, NH65/NH16/NH48 ghat expressway)
-    // Eco bypass via state roads / alternate NH: ₹1.60/km (fewer plazas)
-    const shortestTollRatePerKm = 2.40;
-    const ecoTollRatePerKm = 1.60;
+    // Toll calculation
+    const shortestTollRatePerKm = isEcoSuperiorInClimb ? 2.40 : 2.00;
+    const ecoTollRatePerKm = isEcoSuperiorInClimb ? 1.60 : 2.00;
     const shortestTollINR = Math.round(shortestProfile.distanceKm * shortestTollRatePerKm);
     const ecoTollINR = Math.round(ecoProfile.distanceKm * ecoTollRatePerKm);
-    const tollSavedINR = Math.max(0, shortestTollINR - ecoTollINR);
+    const tollSavedINR = shortestTollINR - ecoTollINR;
 
     const netFuelSavedLiters = Math.round((totalShortestFuel - totalEcoFuel) * 10) / 10;
     const netFuelMoneySavedINR = Math.round(netFuelSavedLiters * dieselPriceINR);
-    const netMoneySavedINR = Math.max(0, netFuelMoneySavedINR) + tollSavedINR;
-    const totalClimbSavedMeters = shortestAnalysis.totalClimbMeters - ecoAnalysis.totalClimbMeters;
+    const netMoneySavedINR = netFuelMoneySavedINR + tollSavedINR;
+    const totalClimbSavedMeters = Math.max(0, climbSaved);
 
-    const isEcoRouteSuperior = (totalShortestFuel + shortestTollINR / dieselPriceINR) > (totalEcoFuel + ecoTollINR / dieselPriceINR);
+    const isEcoRouteSuperior = isEcoSuperiorInClimb && (netMoneySavedINR > 0);
     const segmentedBreakdown = this.calculateSegmentedBreakdown(shortestProfile, ecoProfile, payloadTons, vehicleCategory, mileageKml, dieselPriceINR, customSegments, originCityName, destCityName);
 
     return {
@@ -205,13 +221,13 @@ class ElevationRouter {
         isEcoRouteSuperior,
         netFuelSavedLiters: Math.max(0, netFuelSavedLiters),
         netFuelMoneySavedINR: Math.max(0, netFuelMoneySavedINR),
-        tollSavedINR,
-        netMoneySavedINR,
-        totalClimbSavedMeters: Math.max(0, totalClimbSavedMeters),
+        tollSavedINR: Math.max(0, tollSavedINR),
+        netMoneySavedINR: Math.max(0, netMoneySavedINR),
+        totalClimbSavedMeters,
         co2SavedKg: Math.round(Math.max(0, netFuelSavedLiters) * 2.68),
         summaryText: isEcoRouteSuperior 
-          ? `Eco-Incline Bypass saves ${Math.max(0,netFuelSavedLiters)} L diesel (₹${Math.max(0,netFuelMoneySavedINR).toLocaleString()}) + ₹${tollSavedINR.toLocaleString()} in tolls = ₹${netMoneySavedINR.toLocaleString()} total savings over the shortest mountain highway.`
-          : `The Shortest Highway is already incline-optimal for this corridor.`
+          ? `Eco-Incline Bypass saves ${Math.max(0,netFuelSavedLiters)} L diesel (₹${Math.max(0,netFuelMoneySavedINR).toLocaleString()}) + ₹${Math.max(0,tollSavedINR).toLocaleString()} in tolls = ₹${Math.max(0,netMoneySavedINR).toLocaleString()} total savings over the shortest mountain highway.`
+          : `The Shortest Highway (${shortestProfile.distanceKm} km) is already elevation-optimal for this flat plain corridor. Taking a ${ecoProfile.distanceKm} km detour consumes +${Math.abs(netFuelSavedLiters)} L extra fuel.`
       }
     };
   }
