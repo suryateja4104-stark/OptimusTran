@@ -46,24 +46,183 @@ class TransportPlannerApp {
     const origSelect = document.getElementById('originCitySelect');
     const destSelect = document.getElementById('destCitySelect');
 
-    if (!origSelect || !destSelect) return;
+    if (origSelect && destSelect) {
+      origSelect.innerHTML = '';
+      destSelect.innerHTML = '';
 
-    origSelect.innerHTML = '';
-    destSelect.innerHTML = '';
+      this.cities.forEach(city => {
+        const opt1 = document.createElement('option');
+        opt1.value = city.id;
+        opt1.textContent = city.name;
+        if (city.id === (this.originCity ? this.originCity.id : 'hyd')) opt1.selected = true;
 
-    this.cities.forEach(city => {
-      const opt1 = document.createElement('option');
-      opt1.value = city.id;
-      opt1.textContent = city.name;
-      if (city.id === 'hyd') opt1.selected = true;
+        const opt2 = document.createElement('option');
+        opt2.value = city.id;
+        opt2.textContent = city.name;
+        if (city.id === (this.destCity ? this.destCity.id : 'che')) opt2.selected = true;
 
-      const opt2 = document.createElement('option');
-      opt2.value = city.id;
-      opt2.textContent = city.name;
-      if (city.id === 'che') opt2.selected = true;
+        origSelect.appendChild(opt1);
+        destSelect.appendChild(opt2);
+      });
+    }
 
-      origSelect.appendChild(opt1);
-      destSelect.appendChild(opt2);
+    this.setupCitySearchboxes();
+  }
+
+  setupCitySearchboxes() {
+    this.initSearchbox('originCityInput', 'originCityResults', 'btnClearOrigin', 'originCitySelect', (city) => {
+      this.originCity = city;
+      this.handleCustomCitySelection();
+    });
+
+    this.initSearchbox('destCityInput', 'destCityResults', 'btnClearDest', 'destCitySelect', (city) => {
+      this.destCity = city;
+      this.handleCustomCitySelection();
+    });
+
+    this.syncSearchboxValues();
+  }
+
+  syncSearchboxValues() {
+    const origInput = document.getElementById('originCityInput');
+    const destInput = document.getElementById('destCityInput');
+    const btnClearOrig = document.getElementById('btnClearOrigin');
+    const btnClearDest = document.getElementById('btnClearDest');
+
+    if (origInput && this.originCity) {
+      origInput.value = this.originCity.name;
+      if (btnClearOrig) btnClearOrig.style.display = 'block';
+    }
+    if (destInput && this.destCity) {
+      destInput.value = this.destCity.name;
+      if (btnClearDest) btnClearDest.style.display = 'block';
+    }
+  }
+
+  initSearchbox(inputId, resultsId, clearBtnId, hiddenSelectId, onSelectCallback) {
+    const input = document.getElementById(inputId);
+    const resultsContainer = document.getElementById(resultsId);
+    const clearBtn = document.getElementById(clearBtnId);
+    const hiddenSelect = document.getElementById(hiddenSelectId);
+
+    if (!input || !resultsContainer) return;
+
+    let focusedIndex = -1;
+
+    const renderResults = (searchTerm = '') => {
+      const query = searchTerm.trim().toLowerCase();
+      resultsContainer.innerHTML = '';
+      focusedIndex = -1;
+
+      const filtered = this.cities.filter(c => {
+        if (!query) return true;
+        return c.name.toLowerCase().includes(query) || c.id.toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="city-dropdown-item" style="cursor: default; color: var(--text-muted);">
+            <span>No matching Indian city found</span>
+          </div>
+        `;
+        resultsContainer.classList.add('active');
+        return;
+      }
+
+      filtered.forEach((city) => {
+        const item = document.createElement('div');
+        item.className = 'city-dropdown-item';
+
+        const isSelected = (hiddenSelect && hiddenSelect.value === city.id);
+        if (isSelected) item.classList.add('selected');
+
+        let displayName = city.name;
+        if (query) {
+          const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+          displayName = city.name.replace(regex, '<mark>$1</mark>');
+        }
+
+        item.innerHTML = `
+          <div class="city-title"><i class="fa-solid fa-location-dot" style="color: var(--accent-blue);"></i> ${displayName}</div>
+          <span class="city-alt-badge"><i class="fa-solid fa-mountain"></i> ${city.alt}m</span>
+        `;
+
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectCity(city);
+        });
+
+        resultsContainer.appendChild(item);
+      });
+
+      resultsContainer.classList.add('active');
+    };
+
+    const selectCity = (city) => {
+      input.value = city.name;
+      if (hiddenSelect) hiddenSelect.value = city.id;
+      if (clearBtn) clearBtn.style.display = 'block';
+      resultsContainer.classList.remove('active');
+      onSelectCallback(city);
+    };
+
+    input.addEventListener('focus', () => {
+      renderResults(input.value);
+    });
+
+    input.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (clearBtn) clearBtn.style.display = val ? 'block' : 'none';
+      renderResults(val);
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        input.value = '';
+        clearBtn.style.display = 'none';
+        input.focus();
+        renderResults('');
+      });
+    }
+
+    input.addEventListener('keydown', (e) => {
+      const items = resultsContainer.querySelectorAll('.city-dropdown-item');
+      if (!items.length || !resultsContainer.classList.contains('active')) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusedIndex = (focusedIndex + 1) % items.length;
+        updateFocus(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        focusedIndex = (focusedIndex - 1 + items.length) % items.length;
+        updateFocus(items);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusedIndex >= 0 && items[focusedIndex]) {
+          items[focusedIndex].click();
+        }
+      } else if (e.key === 'Escape') {
+        resultsContainer.classList.remove('active');
+      }
+    });
+
+    const updateFocus = (items) => {
+      items.forEach((item, i) => {
+        if (i === focusedIndex) {
+          item.classList.add('focused');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('focused');
+        }
+      });
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !resultsContainer.contains(e.target)) {
+        resultsContainer.classList.remove('active');
+      }
     });
   }
 
@@ -427,11 +586,20 @@ class TransportPlannerApp {
 
     // Swap Locations Button
     const btnSwap = document.getElementById('btnSwapLocations');
-    if (btnSwap && origSelect && destSelect) {
+    if (btnSwap) {
       btnSwap.addEventListener('click', () => {
-        const tempVal = origSelect.value;
-        origSelect.value = destSelect.value;
-        destSelect.value = tempVal;
+        const tempCity = this.originCity;
+        this.originCity = this.destCity;
+        this.destCity = tempCity;
+
+        const origSelect = document.getElementById('originCitySelect');
+        const destSelect = document.getElementById('destCitySelect');
+        if (origSelect && destSelect) {
+          origSelect.value = this.originCity.id;
+          destSelect.value = this.destCity.id;
+        }
+
+        this.syncSearchboxValues();
         this.handleCustomCitySelection();
       });
     }
@@ -548,24 +716,94 @@ class TransportPlannerApp {
     }
   }
 
+  clearSegmentHighlight() {
+    this.selectedSegment = null;
+    if (this.segmentHighlightLayer && this.map) {
+      try {
+        this.map.removeLayer(this.segmentHighlightLayer);
+      } catch (e) {}
+      this.segmentHighlightLayer = null;
+    }
+    if (this.segmentPopup && this.map) {
+      try {
+        this.map.removeLayer(this.segmentPopup);
+      } catch (e) {}
+      this.segmentPopup = null;
+    }
+    if (this.map) {
+      try {
+        this.map.closePopup();
+        this.map.eachLayer(layer => {
+          if (layer instanceof L.Popup) {
+            this.map.removeLayer(layer);
+          }
+        });
+      } catch (e) {}
+    }
+    const tbody = document.getElementById('segmentTableBody');
+    if (tbody) {
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('segment-row-selected'));
+    }
+    if (this.elevationChart) {
+      this.elevationChart.update();
+    }
+  }
+
+  generateDynamicIntermediateCities(origin, dest) {
+    if (!origin || !dest) return [];
+    const dx = dest.lng - origin.lng;
+    const dy = dest.lat - origin.lat;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 0.0001) return [];
+
+    const candidates = [];
+    (this.cities || window.INDIAN_CITIES || []).forEach(c => {
+      if (c.id === origin.id || c.id === dest.id) return;
+      const vx = c.lng - origin.lng;
+      const vy = c.lat - origin.lat;
+      const t = (vx * dx + vy * dy) / lenSq;
+      const projX = origin.lng + t * dx;
+      const projY = origin.lat + t * dy;
+      const perpDist = Math.sqrt(Math.pow(c.lng - projX, 2) + Math.pow(c.lat - projY, 2));
+
+      if (t > 0.08 && t < 0.92 && perpDist < 3.8) {
+        candidates.push({ ...c, t, perpDist });
+      }
+    });
+
+    candidates.sort((a, b) => a.t - b.t);
+    return candidates;
+  }
+
   loadCorridor(corridorId) {
     const found = this.corridors.find(c => c.id === corridorId);
     if (!found) return;
+
+    this.clearSegmentHighlight();
 
     this.currentCorridor = found;
     this.originCity = this.cities.find(c => c.id === found.originId) || this.cities[0];
     this.destCity = this.cities.find(c => c.id === found.destId) || this.cities[1];
 
-    document.getElementById('originCitySelect').value = this.originCity.id;
-    document.getElementById('destCitySelect').value = this.destCity.id;
+    const origSelect = document.getElementById('originCitySelect');
+    const destSelect = document.getElementById('destCitySelect');
+    if (origSelect) origSelect.value = this.originCity.id;
+    if (destSelect) destSelect.value = this.destCity.id;
 
-    this.updateMapRoutes();
+    this.syncSearchboxValues();
+
     this.recalculateAll();
+    this.updateMapRoutes();
   }
 
   handleCustomCitySelection() {
-    let origId = document.getElementById('originCitySelect').value;
-    let destId = document.getElementById('destCitySelect').value;
+    this.clearSegmentHighlight();
+
+    let origId = document.getElementById('originCitySelect')?.value;
+    let destId = document.getElementById('destCitySelect')?.value;
+
+    if (this.originCity && this.originCity.id) origId = this.originCity.id;
+    if (this.destCity && this.destCity.id) destId = this.destCity.id;
 
     if (!origId || !destId) return;
 
@@ -573,12 +811,15 @@ class TransportPlannerApp {
       const otherCity = this.cities.find(c => c.id !== origId);
       if (otherCity) {
         destId = otherCity.id;
-        document.getElementById('destCitySelect').value = destId;
+        this.destCity = otherCity;
+        const destSelect = document.getElementById('destCitySelect');
+        if (destSelect) destSelect.value = destId;
       }
     }
 
     this.originCity = this.cities.find(c => c.id === origId) || this.cities[0];
     this.destCity = this.cities.find(c => c.id === destId) || this.cities[1];
+    this.syncSearchboxValues();
 
     const preset = this.corridors.find(c => c.originId === origId && c.destId === destId);
     const corridorPresetSelect = document.getElementById('corridorPreset');
@@ -593,6 +834,40 @@ class TransportPlannerApp {
         this.destCity.lat, this.destCity.lng
       ));
 
+      const corridorCities = this.generateDynamicIntermediateCities(this.originCity, this.destCity);
+
+      const shortestWaypoints = [[this.originCity.lat, this.originCity.lng]];
+      const ecoWaypoints = [[this.originCity.lat, this.originCity.lng]];
+      const profileWaypointsShortest = [];
+      const profileWaypointsEco = [];
+      const intermediateCitiesList = [];
+
+      if (corridorCities.length > 0) {
+        corridorCities.forEach((c) => {
+          shortestWaypoints.push([c.lat, c.lng]);
+          ecoWaypoints.push([c.lat + 0.04, c.lng - 0.04]);
+          profileWaypointsShortest.push({ pos: c.t, alt: c.alt, city: `${c.name.split(',')[0]} (${c.alt}m)` });
+          profileWaypointsEco.push({ pos: c.t, alt: Math.max(10, c.alt - 25), city: `${c.name.split(',')[0]} (${Math.max(10, c.alt - 25)}m)` });
+          intermediateCitiesList.push({ name: c.name.split(',')[0], alt: c.alt, lat: c.lat, lng: c.lng });
+        });
+      } else {
+        const midLat = (this.originCity.lat + this.destCity.lat) / 2;
+        const midLng = (this.originCity.lng + this.destCity.lng) / 2;
+        const dLat = this.destCity.lat - this.originCity.lat;
+        const dLng = this.destCity.lng - this.originCity.lng;
+
+        shortestWaypoints.push([midLat - dLng * 0.04, midLng + dLat * 0.04]);
+        ecoWaypoints.push([midLat + dLng * 0.12, midLng - dLat * 0.12]);
+
+        const midAlt = Math.round((this.originCity.alt + this.destCity.alt) / 2);
+        profileWaypointsShortest.push({ pos: 0.5, alt: midAlt + 140, city: `Midway Pass (${midAlt + 140}m)` });
+        profileWaypointsEco.push({ pos: 0.5, alt: midAlt + 30, city: `Bypass Hub (${midAlt + 30}m)` });
+        intermediateCitiesList.push({ name: 'Midway Pass', alt: midAlt + 140, lat: shortestWaypoints[1][0], lng: shortestWaypoints[1][1] });
+      }
+
+      shortestWaypoints.push([this.destCity.lat, this.destCity.lng]);
+      ecoWaypoints.push([this.destCity.lat, this.destCity.lng]);
+
       this.currentCorridor = {
         id: 'custom',
         name: `${this.originCity.name} ➔ ${this.destCity.name}`,
@@ -601,46 +876,31 @@ class TransportPlannerApp {
         distanceKm: dist,
         elevationData: {
           shortestRoute: {
-            name: 'Direct Highway Corridor',
+            name: 'Direct NH Mountain Highway (Shortest)',
             distanceKm: dist,
             totalClimbMeters: Math.round(Math.abs(this.destCity.alt - this.originCity.alt) * 1.8 + 450),
-            maxGrade: 5.5,
-            avgGrade: 1.8,
-            waypoints: [
-              [this.originCity.lat, this.originCity.lng],
-              [this.destCity.lat, this.destCity.lng]
-            ],
-            intermediateCities: [
-              { name: 'Midway Transit Hub', alt: Math.round((this.originCity.alt + this.destCity.alt) / 2), lat: (this.originCity.lat + this.destCity.lat)/2, lng: (this.originCity.lng + this.destCity.lng)/2 }
-            ],
-            points: window.generateElevationProfile(dist, this.originCity.alt, this.destCity.alt, [
-              { pos: 0.3, alt: Math.max(this.originCity.alt, this.destCity.alt) + 250, city: 'Mountain Pass' },
-              { pos: 0.7, alt: Math.min(this.originCity.alt, this.destCity.alt) + 120, city: 'Valley Hub' }
-            ])
+            maxGrade: 6.5,
+            avgGrade: 2.2,
+            waypoints: shortestWaypoints,
+            intermediateCities: intermediateCitiesList,
+            points: window.generateElevationProfile(dist, this.originCity.alt, this.destCity.alt, profileWaypointsShortest)
           },
           ecoRoute: {
-            name: 'Valley Contour Eco Route',
-            distanceKm: Math.round(dist * 1.04),
+            name: 'Valley Contour Eco Bypass',
+            distanceKm: Math.round(dist * 1.05),
             totalClimbMeters: Math.round(Math.abs(this.destCity.alt - this.originCity.alt) * 0.9 + 180),
             maxGrade: 2.5,
             avgGrade: 0.8,
-            waypoints: [
-              [this.originCity.lat, this.originCity.lng],
-              [this.destCity.lat, this.destCity.lng]
-            ],
-            intermediateCities: [
-              { name: 'Valley Plain Hub', alt: Math.round((this.originCity.alt + this.destCity.alt) / 2 - 20), lat: (this.originCity.lat + this.destCity.lat)/2, lng: (this.originCity.lng + this.destCity.lng)/2 }
-            ],
-            points: window.generateElevationProfile(Math.round(dist * 1.04), this.originCity.alt, this.destCity.alt, [
-              { pos: 0.5, alt: (this.originCity.alt + this.destCity.alt) / 2 + 50, city: 'Bypass Plain' }
-            ])
+            waypoints: ecoWaypoints,
+            intermediateCities: intermediateCitiesList,
+            points: window.generateElevationProfile(Math.round(dist * 1.05), this.originCity.alt, this.destCity.alt, profileWaypointsEco)
           }
         }
       };
     }
 
-    this.updateMapRoutes();
     this.recalculateAll();
+    this.updateMapRoutes();
   }
 
   updateVolumeBadge() {
@@ -671,12 +931,43 @@ class TransportPlannerApp {
     return null;
   }
 
+  offsetPolylineCoords(coords, offsetDeg = 0.028) {
+    if (!coords || coords.length < 2) return coords;
+    const n = coords.length;
+    return coords.map((c, i) => {
+      let prev = coords[Math.max(0, i - 1)];
+      let next = coords[Math.min(n - 1, i + 1)];
+      let dLat = next[0] - prev[0];
+      let dLng = next[1] - prev[1];
+      let len = Math.sqrt(dLat * dLat + dLng * dLng) || 0.0001;
+
+      // Parabolic arc multiplier: 0 at origin pin, peak arc at mid-route, 0 at destination pin
+      const progress = i / (n - 1);
+      const arc = Math.sin(progress * Math.PI);
+      const curOffset = offsetDeg * arc;
+
+      let offLat = (-dLng / len) * curOffset;
+      let offLng = (dLat / len) * curOffset;
+      return [c[0] + offLat, c[1] + offLng];
+    });
+  }
+
   async updateMapRoutes() {
     if (!this.map) return;
     const origin = this.originCity;
     const destination = this.destCity;
     const elevationData = this.currentCorridor.elevationData;
-    const roadPref = document.getElementById('roadRoutePreference').value;
+    const roadPref = document.getElementById('roadRoutePreference') ? document.getElementById('roadRoutePreference').value : 'eco';
+
+    // Immediately clear segment highlights & popups and reset map view to full corridor
+    this.clearSegmentHighlight();
+    const initialBounds = L.latLngBounds([
+      [origin.lat, origin.lng],
+      [destination.lat, destination.lng]
+    ]);
+    try {
+      this.map.fitBounds(initialBounds, { padding: [50, 50], animate: false });
+    } catch (e) {}
 
     if (this.originMarker) this.map.removeLayer(this.originMarker);
     if (this.destMarker) this.map.removeLayer(this.destMarker);
@@ -687,14 +978,14 @@ class TransportPlannerApp {
 
     const originIcon = L.divIcon({
       className: 'custom-pin origin-pin-icon',
-      html: `<div style="background: #059669; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 12px rgba(5, 150, 105, 0.6);"></div>`,
-      iconSize: [16, 16]
+      html: `<div style="background: #059669; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 12px rgba(5, 150, 105, 0.7);"></div>`,
+      iconSize: [18, 18]
     });
 
     const destIcon = L.divIcon({
       className: 'custom-pin dest-pin-icon',
-      html: `<div style="background: #e11d48; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 12px rgba(225, 29, 72, 0.6);"></div>`,
-      iconSize: [16, 16]
+      html: `<div style="background: #e11d48; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 12px rgba(225, 29, 72, 0.7);"></div>`,
+      iconSize: [18, 18]
     });
 
     this.originMarker = L.marker([origin.lat, origin.lng], { icon: originIcon })
@@ -715,23 +1006,91 @@ class TransportPlannerApp {
       ecoInput = elevationData.ecoRoute.waypoints;
     }
 
-    this.realShortestCoords = await this.fetchOsrmRoute(shortestInput) || shortestInput;
-    this.realEcoCoords = await this.fetchOsrmRoute(ecoInput) || ecoInput;
-    const realShortestCoords = this.realShortestCoords;
-    const realEcoCoords = this.realEcoCoords;
+    const fetchedShortest = await this.fetchOsrmRoute(shortestInput) || shortestInput;
+    const fetchedEco = await this.fetchOsrmRoute(ecoInput) || ecoInput;
 
-    this.shortestPolyline = L.polyline(realShortestCoords, {
+    this.realShortestCoords = fetchedShortest;
+    this.realEcoCoords = fetchedEco;
+
+    // Dynamically snap real cities in database to the exact displayed road path coordinates
+    const shortestMatched = window.findCitiesAlongRoadPath(fetchedShortest, this.cities, origin.id, destination.id, 35);
+    const ecoMatched = window.findCitiesAlongRoadPath(fetchedEco, this.cities, origin.id, destination.id, 35);
+
+    if (shortestMatched.length > 0) {
+      elevationData.shortestRoute.intermediateCities = shortestMatched.map(m => ({ name: m.cleanName, alt: m.alt, lat: m.lat, lng: m.lng }));
+    }
+    if (ecoMatched.length > 0) {
+      elevationData.ecoRoute.intermediateCities = ecoMatched.map(m => ({ name: m.cleanName, alt: m.alt, lat: m.lat, lng: m.lng }));
+    }
+
+    // Re-generate elevation profile points using actual distances & elevations of matched road cities
+    const shortestWaypointsForProfile = shortestMatched.map(m => ({
+      pos: Math.min(0.95, Math.max(0.05, m.distanceAlongRoadKm / (elevationData.shortestRoute.distanceKm || 100))),
+      alt: m.alt,
+      city: `${m.cleanName} (${m.alt}m)`
+    }));
+
+    const ecoWaypointsForProfile = ecoMatched.map(m => ({
+      pos: Math.min(0.95, Math.max(0.05, m.distanceAlongRoadKm / (elevationData.ecoRoute.distanceKm || 100))),
+      alt: m.alt,
+      city: `${m.cleanName} (${m.alt}m)`
+    }));
+
+    if (shortestWaypointsForProfile.length > 0) {
+      elevationData.shortestRoute.points = window.generateElevationProfile(
+        elevationData.shortestRoute.distanceKm, origin.alt, destination.alt, shortestWaypointsForProfile
+      );
+    }
+    if (ecoWaypointsForProfile.length > 0) {
+      elevationData.ecoRoute.points = window.generateElevationProfile(
+        elevationData.ecoRoute.distanceKm, origin.alt, destination.alt, ecoWaypointsForProfile
+      );
+    }
+
+    // Draw Shortest Highway (Red) on direct road path and Eco-Incline Route (Green) along parallel low-elevation contour arc
+    const renderShortestCoords = fetchedShortest;
+    const renderEcoCoords = this.offsetPolylineCoords(fetchedEco, -0.008);
+
+    // Draw Shortest Highway Polyline (RED)
+    this.shortestPolyline = L.polyline(renderShortestCoords, {
       color: '#e11d48',
-      weight: (roadPref === 'shortest') ? 6 : 3,
-      dashArray: '6, 8',
-      opacity: (roadPref === 'shortest') ? 0.95 : 0.4
-    }).addTo(this.map).bindPopup(`<b>🔴 Red Line: Shortest Highway</b><br>Snaps to exact National Highway road geometry.`);
+      weight: (roadPref === 'shortest') ? 6 : 4,
+      dashArray: '8, 6',
+      opacity: (roadPref === 'shortest') ? 1.0 : 0.85
+    }).addTo(this.map).bindPopup(`<b>🔴 Red Line: Shortest Highway</b><br>Direct highway path with mountain gradient cuts.`);
 
-    this.ecoPolyline = L.polyline(realEcoCoords, {
+    // Draw Eco-Incline Polyline (GREEN)
+    this.ecoPolyline = L.polyline(renderEcoCoords, {
       color: '#059669',
-      weight: (roadPref === 'eco') ? 6 : 3,
-      opacity: (roadPref === 'eco') ? 0.95 : 0.4
-    }).addTo(this.map).bindPopup(`<b>🟢 Green Line: Eco-Incline Route</b><br>Snaps to exact Bypass Expressway road geometry.`);
+      weight: (roadPref === 'eco') ? 6 : 4,
+      opacity: (roadPref === 'eco') ? 1.0 : 0.85
+    }).addTo(this.map).bindPopup(`<b>🟢 Green Line: Eco-Incline Route</b><br>Optimized bypass expressway with minimal vertical climb.`);
+
+    // Bring active strategy route to front so it stays on top, while inactive is still clearly visible below!
+    if (roadPref === 'shortest') {
+      this.shortestPolyline.bringToFront();
+    } else {
+      this.ecoPolyline.bringToFront();
+    }
+
+    // Make map overlay legend items interactive to highlight routes on click
+    const legendEl = document.querySelector('.map-overlay-legend');
+    if (legendEl) {
+      legendEl.style.cursor = 'pointer';
+      legendEl.onclick = (e) => {
+        const item = e.target.closest('.legend-item');
+        if (!item) return;
+        const text = item.textContent || '';
+        const roadPrefSelect = document.getElementById('roadRoutePreference');
+        if (text.includes('Shortest')) {
+          if (roadPrefSelect) roadPrefSelect.value = 'shortest';
+        } else if (text.includes('Eco')) {
+          if (roadPrefSelect) roadPrefSelect.value = 'eco';
+        }
+        this.updateMapRoutes();
+        this.recalculateAll();
+      };
+    }
 
     const activeRouteObj = (roadPref === 'eco') ? elevationData.ecoRoute : elevationData.shortestRoute;
     if (activeRouteObj.intermediateCities) {
@@ -740,8 +1099,8 @@ class TransportPlannerApp {
           const pinColor = (roadPref === 'eco') ? '#059669' : '#e11d48';
           const cityIcon = L.divIcon({
             className: 'custom-pin city-pin-icon',
-            html: `<div style="background: ${pinColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 10px ${pinColor};"></div>`,
-            iconSize: [12, 12]
+            html: `<div style="background: ${pinColor}; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 0 10px ${pinColor};"></div>`,
+            iconSize: [14, 14]
           });
           const m = L.marker([city.lat, city.lng], { icon: cityIcon })
             .addTo(this.map)
@@ -761,6 +1120,7 @@ class TransportPlannerApp {
       if (this.map) this.map.invalidateSize();
     }, 100);
 
+    this.recalculateAll();
     this.updateElevationChart(elevationData);
     this.renderIntermediateCitiesStrip();
   }
@@ -1139,7 +1499,7 @@ class TransportPlannerApp {
 
     const midIdx = Math.floor(segCoords.length / 2);
     const midCoord = segCoords[midIdx] || startCoord;
-    L.popup({ autoClose: false, closeOnClick: false })
+    this.segmentPopup = L.popup({ autoClose: true, closeOnClick: true })
       .setLatLng(midCoord)
       .setContent(`
         <div style="font-family: Inter, sans-serif; padding: 4px;">

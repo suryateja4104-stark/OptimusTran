@@ -18,7 +18,28 @@ const INDIAN_CITIES = [
   { id: 'cbe', name: 'Coimbatore, Tamil Nadu', lat: 11.0168, lng: 76.9558, alt: 411 },
   { id: 'lko', name: 'Lucknow, Uttar Pradesh', lat: 26.8467, lng: 80.9462, alt: 123 },
   { id: 'goa', name: 'Goa (Panaji)', lat: 15.4909, lng: 73.8278, alt: 10 },
-  { id: 'cok', name: 'Kochi, Kerala', lat: 9.9312, lng: 76.2673, alt: 2 }
+  { id: 'cok', name: 'Kochi, Kerala', lat: 9.9312, lng: 76.2673, alt: 2 },
+  { id: 'nel', name: 'Nellore, Andhra Pradesh', lat: 14.4420, lng: 79.9860, alt: 19 },
+  { id: 'slp', name: 'Solapur, Maharashtra', lat: 17.6599, lng: 75.9064, alt: 458 },
+  { id: 'vja', name: 'Vijayawada, Andhra Pradesh', lat: 16.5060, lng: 80.6480, alt: 18 },
+  { id: 'knl', name: 'Kurnool, Andhra Pradesh', lat: 15.8280, lng: 78.0370, alt: 274 },
+  { id: 'tpt', name: 'Tirupati, Andhra Pradesh', lat: 13.6288, lng: 79.4192, alt: 160 },
+  { id: 'ong', name: 'Ongole, Andhra Pradesh', lat: 15.5050, lng: 80.0490, alt: 10 },
+  { id: 'nsk', name: 'Nashik, Maharashtra', lat: 20.0000, lng: 73.7800, alt: 584 },
+  { id: 'idr', name: 'Indore, Madhya Pradesh', lat: 22.7196, lng: 75.8577, alt: 553 },
+  { id: 'bpl', name: 'Bhopal, Madhya Pradesh', lat: 23.2599, lng: 77.4126, alt: 500 },
+  { id: 'bdq', name: 'Vadodara, Gujarat', lat: 22.3072, lng: 73.1812, alt: 39 },
+  { id: 'raj', name: 'Rajkot, Gujarat', lat: 22.3039, lng: 70.8022, alt: 128 },
+  { id: 'mys', name: 'Mysuru, Karnataka', lat: 12.2958, lng: 76.6394, alt: 763 },
+  { id: 'ixe', name: 'Mangaluru, Karnataka', lat: 12.9141, lng: 74.8560, alt: 22 },
+  { id: 'ixg', name: 'Belagavi, Karnataka', lat: 15.8497, lng: 74.4977, alt: 762 },
+  { id: 'hbk', name: 'Hubballi, Karnataka', lat: 15.3647, lng: 75.1240, alt: 671 },
+  { id: 'ixm', name: 'Madurai, Tamil Nadu', lat: 9.9252, lng: 78.1198, alt: 101 },
+  { id: 'ccj', name: 'Kozhikode, Kerala', lat: 11.2588, lng: 75.7804, alt: 1 },
+  { id: 'pat', name: 'Patna, Bihar', lat: 25.5941, lng: 85.1376, alt: 53 },
+  { id: 'ixc', name: 'Chandigarh / Mohali', lat: 30.7333, lng: 76.7794, alt: 321 },
+  { id: 'ldh', name: 'Ludhiana, Punjab', lat: 30.9010, lng: 75.8573, alt: 244 },
+  { id: 'gau', name: 'Guwahati, Assam', lat: 26.1445, lng: 91.7362, alt: 55 }
 ];
 
 const PRESET_CORRIDORS = [
@@ -330,7 +351,113 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
+/**
+ * Perpendicular distance in km from point (pLat, pLng) to line segment (aLat, aLng) -> (bLat, bLng)
+ */
+function distanceToSegmentKm(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const cosLat = Math.cos((aLat * Math.PI) / 180);
+  const px = (pLng - aLng) * 111.32 * cosLat;
+  const py = (pLat - aLat) * 111.32;
+  const bx = (bLng - aLng) * 111.32 * cosLat;
+  const by = (bLat - aLat) * 111.32;
+
+  const l2 = bx * bx + by * by;
+  if (l2 === 0) return Math.sqrt(px * px + py * py);
+
+  let t = (px * bx + py * by) / l2;
+  t = Math.max(0, Math.min(1, t));
+
+  const projX = t * bx;
+  const projY = t * by;
+
+  const dx = px - projX;
+  const dy = py - projY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function segmentFraction(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const cosLat = Math.cos((aLat * Math.PI) / 180);
+  const px = (pLng - aLng) * 111.32 * cosLat;
+  const py = (pLat - aLat) * 111.32;
+  const bx = (bLng - aLng) * 111.32 * cosLat;
+  const by = (bLat - aLat) * 111.32;
+
+  const l2 = bx * bx + by * by;
+  if (l2 === 0) return 0;
+
+  let t = (px * bx + py * by) / l2;
+  return Math.max(0, Math.min(1, t));
+}
+
+/**
+ * Traverse the actual road polyline coordinates and find real cities from the database
+ * that fall within maxDistanceKm of the displayed road path, sorted strictly chronologically.
+ */
+function findCitiesAlongRoadPath(roadCoords, citiesDatabase, originId, destId, maxDistanceKm = 30) {
+  if (!roadCoords || roadCoords.length < 2 || !citiesDatabase) return [];
+
+  const cumDistances = [0];
+  let totalKm = 0;
+  for (let i = 0; i < roadCoords.length - 1; i++) {
+    const segDist = calculateHaversineDistance(
+      roadCoords[i][0], roadCoords[i][1],
+      roadCoords[i + 1][0], roadCoords[i + 1][1]
+    );
+    totalKm += segDist;
+    cumDistances.push(totalKm);
+  }
+
+  const matched = [];
+
+  citiesDatabase.forEach(city => {
+    if (city.id === originId || city.id === destId) return;
+
+    let minDistanceToRoad = Infinity;
+    let closestDistanceAlongRoad = 0;
+
+    for (let i = 0; i < roadCoords.length - 1; i++) {
+      const p1 = roadCoords[i];
+      const p2 = roadCoords[i + 1];
+
+      const distToSeg = distanceToSegmentKm(city.lat, city.lng, p1[0], p1[1], p2[0], p2[1]);
+      if (distToSeg < minDistanceToRoad) {
+        minDistanceToRoad = distToSeg;
+        const frac = segmentFraction(city.lat, city.lng, p1[0], p1[1], p2[0], p2[1]);
+        const segLen = (cumDistances[i + 1] - cumDistances[i]);
+        closestDistanceAlongRoad = cumDistances[i] + (frac * segLen);
+      }
+    }
+
+    if (minDistanceToRoad <= maxDistanceKm) {
+      matched.push({
+        id: city.id,
+        name: city.name,
+        cleanName: city.name.split(',')[0].trim(),
+        lat: city.lat,
+        lng: city.lng,
+        alt: city.alt,
+        distanceAlongRoadKm: Math.round(closestDistanceAlongRoad),
+        distFromRoadKm: Math.round(minDistanceToRoad * 10) / 10
+      });
+    }
+  });
+
+  matched.sort((a, b) => a.distanceAlongRoadKm - b.distanceAlongRoadKm);
+
+  const result = [];
+  matched.forEach(c => {
+    if (result.length === 0 || (c.distanceAlongRoadKm - result[result.length - 1].distanceAlongRoadKm) > 10) {
+      result.push(c);
+    }
+  });
+
+  return result;
+}
+
 window.INDIAN_CITIES = INDIAN_CITIES;
 window.PRESET_CORRIDORS = PRESET_CORRIDORS;
 window.calculateHaversineDistance = calculateHaversineDistance;
+window.distanceToSegmentKm = distanceToSegmentKm;
+window.segmentFraction = segmentFraction;
+window.findCitiesAlongRoadPath = findCitiesAlongRoadPath;
 window.generateElevationProfile = generateElevationProfile;

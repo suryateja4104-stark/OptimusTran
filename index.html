@@ -93,12 +93,16 @@
       <div class="panel-section">
         <h3 class="section-title"><i class="fa-solid fa-location-dot"></i> Origin & Destination Cities</h3>
         
-        <div class="input-group">
-          <label for="originCitySelect">Origin (Point A)</label>
-          <div class="input-with-icon">
-            <i class="fa-solid fa-circle-dot origin-pin"></i>
-            <select id="originCitySelect" class="sidebar-select"></select>
+        <div class="input-group city-searchbox-group" id="originSearchboxGroup">
+          <label for="originCityInput">Origin City (Point A)</label>
+          <div class="city-searchbox-wrapper">
+            <i class="fa-solid fa-circle-dot origin-pin search-icon"></i>
+            <input type="text" id="originCityInput" class="city-search-input" placeholder="Type city name (e.g. Pune, Nellore)..." autocomplete="off">
+            <button type="button" class="btn-clear-city" id="btnClearOrigin" title="Clear search" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+            <div class="city-dropdown-results" id="originCityResults"></div>
           </div>
+          <!-- Hidden select for fallback -->
+          <select id="originCitySelect" class="sidebar-select" style="display:none;"></select>
         </div>
 
         <div class="swap-btn-container">
@@ -107,12 +111,16 @@
           </button>
         </div>
 
-        <div class="input-group">
-          <label for="destCitySelect">Destination (Point B)</label>
-          <div class="input-with-icon">
-            <i class="fa-solid fa-location-dot dest-pin"></i>
-            <select id="destCitySelect" class="sidebar-select"></select>
+        <div class="input-group city-searchbox-group" id="destSearchboxGroup">
+          <label for="destCityInput">Destination City (Point B)</label>
+          <div class="city-searchbox-wrapper">
+            <i class="fa-solid fa-location-dot dest-pin search-icon"></i>
+            <input type="text" id="destCityInput" class="city-search-input" placeholder="Type city name (e.g. Nellore, Solapur)..." autocomplete="off">
+            <button type="button" class="btn-clear-city" id="btnClearDest" title="Clear search" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+            <div class="city-dropdown-results" id="destCityResults"></div>
           </div>
+          <!-- Hidden select for fallback -->
+          <select id="destCitySelect" class="sidebar-select" style="display:none;"></select>
         </div>
       </div>
 

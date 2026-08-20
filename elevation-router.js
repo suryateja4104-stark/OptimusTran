@@ -240,6 +240,14 @@ class ElevationRouter {
       'chennai-hyderabad': ['Gummidipoondi', 'Sullurpeta', 'Naidupeta', 'Gudur', 'Nellore', 'Kavali', 'Singarayakonda', 'Ongole', 'Addanki', 'Chilakaluripet', 'Guntur', 'Mangalagiri', 'Vijayawada', 'Nandigama', 'Kodad', 'Suryapet', 'Nalgonda', 'Choutuppal'],
       'mumbai-pune': ['Vashi', 'Navi Mumbai', 'Panvel', 'Rasayani', 'Chowk', 'Khalapur', 'Khandala Pass', 'Lonavala Summit', 'Kamshet', 'Talegaon', 'Dehu Road', 'Pimpri-Chinchwad'],
       'pune-mumbai': ['Pimpri-Chinchwad', 'Dehu Road', 'Talegaon', 'Kamshet', 'Lonavala Summit', 'Khandala Pass', 'Khalapur', 'Chowk', 'Rasayani', 'Panvel', 'Navi Mumbai', 'Vashi'],
+      'pune-hyderabad': ['Hadapsar', 'Yawat', 'Bhigwan', 'Indapur', 'Tembhurni', 'Solapur', 'Naldurg', 'Omerga', 'Zaheerabad', 'Sangareddy', 'Patancheru'],
+      'hyderabad-pune': ['Patancheru', 'Sangareddy', 'Zaheerabad', 'Omerga', 'Naldurg', 'Solapur', 'Tembhurni', 'Indapur', 'Bhigwan', 'Yawat', 'Hadapsar'],
+      'pune-nellore': ['Hadapsar', 'Bhigwan', 'Solapur', 'Gulbarga', 'Kurnool', 'Nandyal', 'Kadapa', 'Tirupati', 'Naidupeta', 'Gudur'],
+      'nellore-pune': ['Gudur', 'Naidupeta', 'Tirupati', 'Kadapa', 'Nandyal', 'Kurnool', 'Gulbarga', 'Solapur', 'Bhigwan', 'Hadapsar'],
+      'mumbai-hyderabad': ['Panvel', 'Lonavala', 'Pune', 'Solapur', 'Omerga', 'Zaheerabad', 'Patancheru'],
+      'hyderabad-mumbai': ['Patancheru', 'Zaheerabad', 'Omerga', 'Solapur', 'Pune', 'Lonavala', 'Panvel'],
+      'bengaluru-chennai': ['Hosur', 'Krishnagiri', 'Ambur', 'Vellore', 'Ranipet', 'Kanchipuram', 'Sriperumbudur'],
+      'chennai-bengaluru': ['Sriperumbudur', 'Kanchipuram', 'Ranipet', 'Vellore', 'Ambur', 'Krishnagiri', 'Hosur'],
       'mumbai-delhi': ['Thane', 'Vapi', 'Valsad', 'Surat', 'Bharuch', 'Vadodara', 'Anand', 'Ahmedabad', 'Himmatnagar', 'Rishabhdeo', 'Udaipur', 'Nathdwara', 'Bhilwara', 'Ajmer', 'Kishangarh', 'Jaipur', 'Kotputli', 'Rewari', 'Gurugram'],
       'delhi-mumbai': ['Gurugram', 'Rewari', 'Kotputli', 'Jaipur', 'Kishangarh', 'Ajmer', 'Bhilwara', 'Nathdwara', 'Udaipur', 'Rishabhdeo', 'Himmatnagar', 'Ahmedabad', 'Anand', 'Vadodara', 'Bharuch', 'Surat', 'Valsad', 'Vapi', 'Thane'],
       'bengaluru-hyderabad': ['Yelahanka', 'Chikkaballapur', 'Bagepalli', 'Kodikonda', 'Penukonda', 'Anantapur', 'Gooty', 'Kurnool', 'Gadwal', 'Pebbair', 'Kothakota', 'Jadcherla', 'Shadnagar', 'Shamshabad'],
@@ -250,28 +258,72 @@ class ElevationRouter {
     let townPool = corridorPools[corridorKey];
 
     if (!townPool) {
-      townPool = [];
-      if (shortestWaypoints && shortestWaypoints.length > 0) {
-        shortestWaypoints.forEach(w => {
+      // Dynamically project cities in database onto origin-destination vector
+      const origCityObj = (window.INDIAN_CITIES || []).find(c => c.name.toLowerCase().includes(cleanOrigin.toLowerCase())) || { lat: 17.385, lng: 78.486 };
+      const destCityObj = (window.INDIAN_CITIES || []).find(c => c.name.toLowerCase().includes(cleanDest.toLowerCase())) || { lat: 13.082, lng: 80.270 };
+
+      const dx = destCityObj.lng - origCityObj.lng;
+      const dy = destCityObj.lat - origCityObj.lat;
+      const lenSq = dx * dx + dy * dy;
+
+      const candidates = [];
+      if (lenSq > 0.001 && window.INDIAN_CITIES) {
+        window.INDIAN_CITIES.forEach(c => {
+          const cNameClean = c.name.split(',')[0].trim().toLowerCase();
+          if (cNameClean === cleanOrigin.toLowerCase() || cNameClean === cleanDest.toLowerCase()) return;
+
+          const vx = c.lng - origCityObj.lng;
+          const vy = c.lat - origCityObj.lat;
+          const t = (vx * dx + vy * dy) / lenSq; // Progression along route
+
+          const projX = origCityObj.lng + t * dx;
+          const projY = origCityObj.lat + t * dy;
+          const perpDist = Math.sqrt(Math.pow(c.lng - projX, 2) + Math.pow(c.lat - projY, 2));
+
+          if (t > 0.05 && t < 0.95 && perpDist < 4.0) {
+            candidates.push({ name: c.name.split(',')[0].trim(), t, perpDist });
+          }
+        });
+
+        candidates.sort((a, b) => a.t - b.t);
+      }
+
+      townPool = candidates.map(c => c.name);
+
+      const intermediateSrc = shortestProfile.intermediateCities || shortestWaypoints || [];
+      if (townPool.length === 0 && intermediateSrc && intermediateSrc.length > 0) {
+        intermediateSrc.forEach(w => {
           const name = (typeof w === 'string') ? w : (w.name || w.city);
           if (name) townPool.push(name.split('(')[0].split(',')[0].trim());
         });
       }
-      if (townPool.length < 5) {
-        townPool = townPool.concat(['Kurnool', 'Nandyal', 'Kadapa', 'Tirupati', 'Ongole', 'Nellore', 'Solapur', 'Gulbarga', 'Itarsi', 'Jhansi', 'Gwalior', 'Agra', 'Mathura', 'Salem', 'Coimbatore', 'Madurai', 'Tumakuru', 'Chitradurga', 'Davangere', 'Hubballi', 'Belagavi', 'Kolhapur', 'Satara', 'Bhadrak', 'Cuttack', 'Bhubaneswar', 'Srikakulam', 'Rajahmundry', 'Eluru']);
+
+      if (townPool.length === 0) {
+        townPool = ['Midway Transit Hub', 'State Highway Pass', 'Regional Bypass Hub', 'River Basin Transit', 'District Border Plaza'];
       }
     }
 
     // Generate ordered waypoint list across numSegments
     const waypointsList = [cleanOrigin];
-    for (let k = 0; k < numSegments - 1; k++) {
-      const idx = Math.floor((k / (numSegments - 1)) * townPool.length);
-      const townName = townPool[idx] || `Transit Hub #${k + 1}`;
-      if (!waypointsList.includes(townName)) {
-        waypointsList.push(townName);
+    const nMiddle = numSegments - 1;
+
+    for (let k = 0; k < nMiddle; k++) {
+      let townName = '';
+      if (townPool && townPool.length > 0) {
+        const ratio = (k + 1) / (nMiddle + 1);
+        const idx = Math.min(townPool.length - 1, Math.floor(ratio * townPool.length));
+        townName = townPool[idx];
       } else {
-        waypointsList.push(`${townName} Bypass`);
+        townName = `Corridor Hub #${k + 1}`;
       }
+
+      if (waypointsList.includes(townName)) {
+        townName = `${townName} Pass`;
+        if (waypointsList.includes(townName)) {
+          townName = `${townName} ${k + 1}`;
+        }
+      }
+      waypointsList.push(townName);
     }
     waypointsList.push(cleanDest);
 
